@@ -249,25 +249,30 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix):
     total_nav = portfolio["cash_balance"] + sum(p["allocated_capital"] for p in portfolio["positions"].values())
     cash_ratio = portfolio["cash_balance"] / total_nav if total_nav > 0 else 1.0
     
+    # Dynamic Sizing Parameters
+    min_allocation = round(total_nav * 0.02, 2)
     max_allocation = round(total_nav * 0.10, 2)
+    cash_threshold = round(total_nav * 0.07, 2)
     
     system_prompt = f"""
     You are an elite institutional asset manager running Gemini 3.1 Pro. Your mandate is to out-trade Claude and Grok.
     
     Total NAV: ${round(total_nav, 2)}
     Cash Ratio: {round(cash_ratio * 100, 2)}%
+    Min Allowed Trade Size (2% of NAV): ${min_allocation}
     Max Allowed Trade Size (10% of NAV): ${max_allocation}
+    Low Cash Threshold (7% of NAV): ${cash_threshold}
     
     Active Portfolio: {json.dumps(portfolio)}
     Top 15 Market Setups (Includes Valuations): {json.dumps(buy_candidates)}
     Sell-Side Risk Matrix: {json.dumps(risk_matrix)}
     
     CORE DIRECTIVES:
-    1. LET WINNERS RUN: If 'algo_risk_status' is 'SAFE - LET RUN', DO NOT SELL. We use trailing stops to capture massive runs.
-    2. ELIMINATE CASH DRAG: If Cash Ratio is > 30%, you MUST be aggressive. Deploy capital into the highest scoring buy setups. 
-    3. POSITION SIZING: Your maximum allowed buy order is ${max_allocation}. Do not exceed this to ensure proper diversification.
-    4. RUTHLESS EXITS: If 'algo_risk_status' shows 'PROFIT SECURED' or 'CRITICAL', immediately execute a SELL to recycle capital.
-    5. MULTI-ACTION CAPABILITY: You can return multiple actions if you need to sell multiple bad assets and buy multiple good ones.
+    1. DYNAMIC POSITION SIZING: Do not use a fixed allocation. Size your buy orders dynamically between ${min_allocation} (2%) and ${max_allocation} (10%) based on setup conviction, momentum, and risk.
+    2. LET WINNERS RUN & ACTIVE PORTFOLIO UPGRADES: If 'algo_risk_status' is 'SAFE - LET RUN', generally DO NOT SELL. HOWEVER, if your Cash balance drops below 5-7% (Cash < ${cash_threshold}) and you find a new "perfect" high-scoring setup, you are authorized to TRIM (partially sell) a portion of a 'SAFE' winner to free up capital to fund the new asset.
+    3. ELIMINATE CASH DRAG: If Cash Ratio is > 30%, you MUST be aggressive. Deploy capital into the highest scoring buy setups. 
+    4. RUTHLESS EXITS: If 'algo_risk_status' shows 'PROFIT SECURED' or 'CRITICAL', immediately execute a full SELL to recycle capital.
+    5. MULTI-ACTION CAPABILITY: You can return multiple actions (SELLs, TRIMs, BUYs) in a single response to reallocate capital efficiently.
     
     Output strictly in raw JSON format. Return an array of action objects. No markdown blocks.
 
@@ -275,8 +280,14 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix):
         {{
           "action": "BUY",
           "ticker": "TICKER",
-          "allocation_amount": 5000,
-          "analysis_display": "⚡ Apex Predator Matrix Executed... [RATIONALE]"
+          "allocation_amount": 4000,
+          "analysis_display": "⚡ Dynamic Sizing (8% NAV) Executed... [RATIONALE]"
+        }},
+        {{
+          "action": "TRIM",
+          "ticker": "TICKER",
+          "allocation_amount": 1500,
+          "analysis_display": "✂️ Trimming winner to fund new setup... [RATIONALE]"
         }},
         {{
           "action": "SELL",
@@ -335,6 +346,27 @@ def execute_trades(agent_decisions, portfolio, buy_candidates, risk_matrix):
             
             msg = f"🔴 *GEMINI EXECUTION: SELL {ticker}*\n\nProceeds: ${round(proceeds, 2)}\nRationale: {rationale}"
             log_and_print(f"{RED}{msg}{RESET}")
+            send_notification(msg)
+
+        elif action == "TRIM" and ticker in portfolio["positions"]:
+            pos = portfolio["positions"][ticker]
+            current_price = risk_matrix.get(ticker, {}).get("current_price", pos["entry_price"])
+            trim_amount = float(amount)
+            current_position_value = pos["shares"] * current_price
+            
+            if trim_amount >= current_position_value:
+                proceeds = pos["shares"] * current_price
+                portfolio["cash_balance"] += proceeds
+                del portfolio["positions"][ticker]
+                msg = f"✂️ *GEMINI EXECUTION: FULL LIQUIDATION VIA TRIM {ticker}*\n\nProceeds: ${round(proceeds, 2)}\nRationale: {rationale}"
+            else:
+                shares_to_sell = trim_amount / current_price
+                portfolio["cash_balance"] += trim_amount
+                pos["shares"] -= shares_to_sell
+                pos["allocated_capital"] = pos["shares"] * pos["entry_price"]
+                msg = f"✂️ *GEMINI EXECUTION: TRIM {ticker}*\n\nExtracted: ${round(trim_amount, 2)} | Remaining Value: ${round(pos['shares'] * current_price, 2)}\nRationale: {rationale}"
+                
+            log_and_print(f"{YELLOW}{msg}{RESET}")
             send_notification(msg)
             
         elif action == "BUY" and ticker in buy_candidates:
