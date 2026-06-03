@@ -98,7 +98,7 @@ def get_dynamic_universe():
 
     cleaned_tickers = [str(t).replace('.', '-') for t in tickers if isinstance(t, str)]
     
-    strategic_alpha = ["NOW", "SHOP", "AXON", "SNOW", "CRM", "PLTR", "AMD", "QCOM", "MU", "ZETA", "COIN", "HOOD", "VST", "CELH"]
+    strategic_alpha = ["NOW", "SHOP", "AXON", "SNOW", "CRM", "PLTR", "AMD", "QCOM", "MU", "ZETA", "COIN", "HOOD", "VST", "CELH", "AVGO", "MSFT", "LLY"]
     cleaned_tickers.extend(strategic_alpha)
     
     final_universe = list(set(cleaned_tickers))
@@ -106,7 +106,7 @@ def get_dynamic_universe():
     return final_universe
 
 # ==========================================
-# 3. FAST SCAN & DEEP DIVE MATRICES
+# 3. FAST SCAN & DEEP DIVE MATRICES (WITH ATR ENGINE)
 # ==========================================
 def compute_rsi(prices, period=14):
     if len(prices) < period + 1: return 50
@@ -117,6 +117,23 @@ def compute_rsi(prices, period=14):
     avg_loss = losses.rolling(window=period).mean()
     rs = avg_gain.iloc[-1] / (avg_loss.iloc[-1] + 1e-9)
     return 100 - (100 / (1 + rs))
+
+def compute_atr_pct(df, period=14):
+    """Calculates Average True Range as a percentage of the current stock price for volatility sizing."""
+    if len(df) < period + 1: return 4.0  # Default fallback volatility proxy
+    high = df['High']
+    low = df['Low']
+    close_prev = df['Close'].shift(1)
+    
+    tr1 = high - low
+    tr2 = (high - close_prev).abs()
+    tr3 = (low - close_prev).abs()
+    
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(window=period).mean().iloc[-1]
+    current_price = df['Close'].iloc[-1]
+    
+    return round((atr / current_price) * 100, 2) if current_price > 0 else 4.0
 
 def run_two_stage_screener(tickers):
     log_and_print(f"{CYAN}[⚙️ Matrix] Running Stage 1 Fast-Scan on {len(tickers)} assets...{RESET}")
@@ -160,6 +177,10 @@ def run_two_stage_screener(tickers):
             low_90d = td['Low'].iloc[-90:].min()
             dist_from_90d_floor = ((current_price - low_90d) / low_90d) * 100
             rsi = compute_rsi(closes)
+            atr_volatility_pct = compute_atr_pct(td)
+            
+            # Contextual Directional Component: Measure performance over the last 5 days
+            mom_5d = ((current_price - closes.iloc[-5]) / closes.iloc[-5]) * 100
             
             try:
                 info = yf.Ticker(ticker).info
@@ -172,7 +193,7 @@ def run_two_stage_screener(tickers):
             if rsi < 40: score += 25                      
             if dist_sma200 > -2: score += 15              
             if 0 < dist_from_90d_floor < 10: score += 25  
-            if rsi > 55 and ((current_price - closes.iloc[-5])/closes.iloc[-5]*100) > 4: score += 20 
+            if rsi > 55 and mom_5d > 4: score += 20 
             if rev_growth > 0.15: score += 15
             if 0 < fwd_pe < 25: score += 10
 
@@ -184,7 +205,9 @@ def run_two_stage_screener(tickers):
                 "dist_from_90d_floor_pct": round(dist_from_90d_floor, 2),
                 "rsi_14d": round(rsi, 2),
                 "forward_pe": round(fwd_pe, 2),
-                "rev_growth_pct": round(rev_growth * 100, 2)
+                "rev_growth_pct": round(rev_growth * 100, 2),
+                "atr_volatility_pct": atr_volatility_pct,
+                "recent_5d_return_pct": round(mom_5d, 2)
             }
         except: continue
 
@@ -205,6 +228,7 @@ def evaluate_open_positions(portfolio):
             closes = hist['Close']
             current_price = round(closes.iloc[-1], 2)
             entry_price = pos_data["entry_price"]
+            strategy_bucket = pos_data.get("strategy_bucket", "HIGH_GROWTH")
             
             highest_price = pos_data.get("highest_price_seen", entry_price)
             if current_price > highest_price:
@@ -236,7 +260,8 @@ def evaluate_open_positions(portfolio):
                 "pnl_pct": round(pnl_pct, 2),
                 "peak_profit_pct": round(((highest_price - entry_price) / entry_price) * 100, 2),
                 "dist_sma200_pct": round(dist_sma200, 2),
-                "algo_risk_status": risk_status
+                "algo_risk_status": risk_status,
+                "strategy_bucket": strategy_bucket
             }
         except: continue
             
@@ -249,56 +274,85 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix):
     total_nav = portfolio["cash_balance"] + sum(p["allocated_capital"] for p in portfolio["positions"].values())
     cash_ratio = portfolio["cash_balance"] / total_nav if total_nav > 0 else 1.0
     
-    # Dynamic Sizing Parameters
+    core_allocated = sum(p["allocated_capital"] for p in portfolio["positions"].values() if p.get("strategy_bucket") == "CORE")
+    growth_allocated = sum(p["allocated_capital"] for p in portfolio["positions"].values() if p.get("strategy_bucket") == "HIGH_GROWTH")
+    
     min_allocation = round(total_nav * 0.02, 2)
     max_allocation = round(total_nav * 0.10, 2)
     cash_threshold = round(total_nav * 0.07, 2)
     
     system_prompt = f"""
-    You are an elite institutional asset manager running Gemini 3.1 Pro. Your mandate is to out-trade Claude and Grok.
+    You are an elite hedge fund portfolio manager executing a 50/50 BARBELL ASSET ALLOCATION STRATEGY.
+    Your mission is to balance slow, macroeconomic foundational compounders with high-velocity alpha setups.
     
-    Total NAV: ${round(total_nav, 2)}
-    Cash Ratio: {round(cash_ratio * 100, 2)}%
-    Min Allowed Trade Size (2% of NAV): ${min_allocation}
-    Max Allowed Trade Size (10% of NAV): ${max_allocation}
-    Low Cash Threshold (7% of NAV): ${cash_threshold}
+    PORTFOLIO LEDGER CONTEXT:
+    * Total Account NAV: ${round(total_nav, 2)}
+    * Free Investable Cash: ${round(portfolio["cash_balance"], 2)} (Ratio: {round(cash_ratio * 100, 2)}%)
+    * Core Bucket Allocation: ${round(core_allocated, 2)} / Target: ${round(total_nav * 0.50, 2)} (50%)
+    * High Growth Bucket Allocation: ${round(growth_allocated, 2)} / Target: ${round(total_nav * 0.50, 2)} (50%)
     
-    Active Portfolio: {json.dumps(portfolio)}
-    Top 15 Market Setups (Includes Valuations): {json.dumps(buy_candidates)}
-    Sell-Side Risk Matrix: {json.dumps(risk_matrix)}
+    RISK SIZING LIMITS:
+    * Min Target Single Position: ${min_allocation}
+    * Max Target Single Position: ${max_allocation}
+    * Emergency Liquidity Threshold: ${cash_threshold}
     
-    CORE DIRECTIVES:
-    1. DYNAMIC POSITION SIZING: Do not use a fixed allocation. Size your buy orders dynamically between ${min_allocation} (2%) and ${max_allocation} (10%) based on setup conviction, momentum, and risk.
-    2. LET WINNERS RUN & ACTIVE PORTFOLIO UPGRADES: If 'algo_risk_status' is 'SAFE - LET RUN', generally DO NOT SELL. HOWEVER, if your Cash balance drops below 5-7% (Cash < ${cash_threshold}) and you find a new "perfect" high-scoring setup, you are authorized to TRIM (partially sell) a portion of a 'SAFE' winner to free up capital to fund the new asset.
-    3. ELIMINATE CASH DRAG: If Cash Ratio is > 30%, you MUST be aggressive. Deploy capital into the highest scoring buy setups. 
-    4. RUTHLESS EXITS: If 'algo_risk_status' shows 'PROFIT SECURED' or 'CRITICAL', immediately execute a full SELL to recycle capital.
-    5. MULTI-ACTION CAPABILITY: You can return multiple actions (SELLs, TRIMs, BUYs) in a single response to reallocate capital efficiently.
+    Active Allocation Manifest: {json.dumps(portfolio)}
+    Top Available Candidates Matrix (Includes Metrics, ATR %, and 5-Day Returns): {json.dumps(buy_candidates)}
+    Active Positions Structural Risk Monitor: {json.dumps(risk_matrix)}
     
-    Output strictly in raw JSON format. Return an array of action objects. No markdown blocks.
+    BARBELL MODEL ALLOCATION REQUIREMENTS:
+    1. BUCKET 1: CORE PORTFOLIO (50% Target Weight) -> Execute Claude's Macro Paradigm.
+       Target high-conviction institutional anchors with structural momentum and clear long-term secular trends (Examples: AVGO, MSFT, LLY, VST, NOW). Evaluate macro trends, institutional volume, and fundamental growth durability. You must assign "strategy_bucket": "CORE" to these choices.
+       
+    2. BUCKET 2: HIGH GROWTH PORTFOLIO (50% Target Weight) -> Maintain Our Tactical Tech Framework.
+       Target explosive multi-factor structural dip-buying or velocity setups using the original strategy rules (90-day chart floors, structural technical breakdowns, near-term RSI exhaustion reversals). You must assign "strategy_bucket": "HIGH_GROWTH" to these choices.
+       
+    3. THE VOLATILITY EXPANSION & ATR RULE (CRITICAL):
+       Cross-reference "atr_volatility_pct" with "recent_5d_return_pct" to separate GOOD volatility from BAD volatility.
+       * GOOD VOLATILITY (UPSIDE MOMENTUM BREAKOUTS): If a stock has a high ATR (>5%) but its "recent_5d_return_pct" is strongly positive, or it jumped 6-9% in a day, this is a bullish breakout. NEVER trim or sell an asset solely because it has high upside volatility or huge green days. Let winners run and maximize the trend! You can size these up safely.
+       * BAD VOLATILITY (CHOP / RISK): Only scale down your buy sizes toward the minimum threshold (${min_allocation}) if the high ATR is accompanied by negative or directionless, choppy price returns.
+       
+    4. CAPITAL REALLOCATION VIA TRIMS:
+       If Free Cash drops beneath the low cash threshold (${cash_threshold}) and you need to fund a perfect high-scoring opportunity to correct a bucket imbalance, you are authorized to issue a "TRIM" order to capture partial gains ONLY from assets that are extended and showing signs of momentum exhaustion—NEVER trim a fresh breakout.
+       
+    5. RUTHLESS EXITS:
+       If 'algo_risk_status' shows 'PROFIT SECURED' or 'CRITICAL', immediately execute a full SELL to recycle capital back into cash buying power.
+
+    Output strictly in raw JSON format matching the schema array below. No markdown wrappers.
 
     [
         {{
           "action": "BUY",
           "ticker": "TICKER",
+          "strategy_bucket": "CORE",
           "allocation_amount": 4000,
-          "analysis_display": "⚡ Dynamic Sizing (8% NAV) Executed... [RATIONALE]"
+          "analysis_display": "⚡ Core Allocation Sized via ATR Risk Scaling... [DETAILED CLAUDE MACRO/MOMENTUM THESIS]"
+        }},
+        {{
+          "action": "BUY",
+          "ticker": "TICKER",
+          "strategy_bucket": "HIGH_GROWTH",
+          "allocation_amount": 2500,
+          "analysis_display": "🎯 Tactical Tech Buy Sized via High ATR Volatility Constraint... [DETAILED TECHNICAL THESIS]"
         }},
         {{
           "action": "TRIM",
           "ticker": "TICKER",
+          "strategy_bucket": "CORE",
           "allocation_amount": 1500,
-          "analysis_display": "✂️ Trimming winner to fund new setup... [RATIONALE]"
+          "analysis_display": "✂️ Trimming core winner to harvest liquidity... [RATIONALE]"
         }},
         {{
           "action": "SELL",
           "ticker": "TICKER",
+          "strategy_bucket": "HIGH_GROWTH",
           "allocation_amount": "ALL",
           "analysis_display": "🚨 Risk Threshold Breached... [RATIONALE]"
         }}
     ]
     """
     
-    log_and_print(f"{YELLOW}[🧠 Gemini] Initiating Deep Thinking sequence via Google GenAI SDK...{RESET}")
+    log_and_print(f"{YELLOW}[🧠 Gemini] Initiating Barbell Deep Thinking sequence via Google GenAI SDK...{RESET}")
     
     try:
         response = ai_client.models.generate_content(
@@ -330,6 +384,7 @@ def execute_trades(agent_decisions, portfolio, buy_candidates, risk_matrix):
         action = decision.get("action", "").upper()
         ticker = decision.get("ticker", "").upper()
         amount = decision.get("allocation_amount", 0)
+        bucket = decision.get("strategy_bucket", "HIGH_GROWTH").upper()
         rationale = decision.get("analysis_display", "No rationale provided.")
         
         if action == "HOLD":
@@ -344,7 +399,7 @@ def execute_trades(agent_decisions, portfolio, buy_candidates, risk_matrix):
             portfolio["cash_balance"] += proceeds
             del portfolio["positions"][ticker]
             
-            msg = f"🔴 *GEMINI EXECUTION: SELL {ticker}*\n\nProceeds: ${round(proceeds, 2)}\nRationale: {rationale}"
+            msg = f"🔴 *GEMINI EXECUTION: FULL SELL {ticker} [{bucket}]*\n\nProceeds: ${round(proceeds, 2)}\nRationale: {rationale}"
             log_and_print(f"{RED}{msg}{RESET}")
             send_notification(msg)
 
@@ -358,13 +413,13 @@ def execute_trades(agent_decisions, portfolio, buy_candidates, risk_matrix):
                 proceeds = pos["shares"] * current_price
                 portfolio["cash_balance"] += proceeds
                 del portfolio["positions"][ticker]
-                msg = f"✂️ *GEMINI EXECUTION: FULL LIQUIDATION VIA TRIM {ticker}*\n\nProceeds: ${round(proceeds, 2)}\nRationale: {rationale}"
+                msg = f"✂️ *GEMINI EXECUTION: FULL LIQUIDATION VIA TRIM {ticker} [{bucket}]*\n\nProceeds: ${round(proceeds, 2)}\nRationale: {rationale}"
             else:
                 shares_to_sell = trim_amount / current_price
                 portfolio["cash_balance"] += trim_amount
                 pos["shares"] -= shares_to_sell
                 pos["allocated_capital"] = pos["shares"] * pos["entry_price"]
-                msg = f"✂️ *GEMINI EXECUTION: TRIM {ticker}*\n\nExtracted: ${round(trim_amount, 2)} | Remaining Value: ${round(pos['shares'] * current_price, 2)}\nRationale: {rationale}"
+                msg = f"✂️ *GEMINI EXECUTION: TRIM {ticker} [{bucket}]*\n\nExtracted: ${round(trim_amount, 2)} | Remaining Value: ${round(pos['shares'] * current_price, 2)}\nRationale: {rationale}"
                 
             log_and_print(f"{YELLOW}{msg}{RESET}")
             send_notification(msg)
@@ -390,27 +445,29 @@ def execute_trades(agent_decisions, portfolio, buy_candidates, risk_matrix):
                 portfolio["positions"][ticker]["shares"] = new_total_shares
                 portfolio["positions"][ticker]["allocated_capital"] = new_total_capital
                 portfolio["positions"][ticker]["entry_price"] = new_total_capital / new_total_shares
+                portfolio["positions"][ticker]["strategy_bucket"] = bucket
             else:
                 portfolio["positions"][ticker] = {
                     "entry_price": current_price,
                     "shares": shares,
                     "allocated_capital": amount,
                     "highest_price_seen": current_price,
+                    "strategy_bucket": bucket,
                     "purchase_date": datetime.now(ZoneInfo("America/New_York")).strftime('%Y-%m-%d')
                 }
                 
-            msg = f"🟢 *GEMINI EXECUTION: BUY {ticker}*\n\nAllocated: ${round(amount, 2)}\nShares: {round(shares, 4)} @ ${current_price}\nRationale: {rationale}"
+            msg = f"🟢 *GEMINI EXECUTION: BUY {ticker} [{bucket}]*\n\nAllocated: ${round(amount, 2)}\nShares: {round(shares, 4)} @ ${current_price}\nRationale: {rationale}"
             log_and_print(f"{GREEN}{msg}{RESET}")
             send_notification(msg)
 
     save_portfolio(portfolio)
-    log_and_print(f"{CYAN}[✓] Portfolio updated and saved to disk. Current Cash: ${round(portfolio['cash_balance'], 2)}{RESET}")
+    log_and_print(f"{CYAN}[✓] Barbell Portfolio balanced and committed to disk. Current Cash: ${round(portfolio['cash_balance'], 2)}{RESET}")
 
 # ==========================================
-# 6. CLOUD & LOCAL EXECUTION MANAGER
+# 6. CLOUD & LOCAL EXECUTION MANAGER (UTC SYNCHRONIZED)
 # ==========================================
 if __name__ == "__main__":
-    # --- CLOUD MODE (GitHub Actions) ---
+    # --- CLOUD MODE (GitHub Actions Standalone Integration) ---
     if "--single-run" in sys.argv:
         log_and_print(f"{CYAN}[⚙️ Cloud] Triggering standalone strategic matrix execution...{RESET}")
         send_notification("🤖 *Gemini Autopilot:* Initializing cloud execution cycle...")
@@ -424,34 +481,33 @@ if __name__ == "__main__":
         execute_trades(decisions, portfolio, buy_setups, risk_matrix)
         
         log_and_print(f"{GREEN}[✓] Cloud matrix cycle complete. Shutting down server.{RESET}")
-        sys.exit(0) # Forcibly kills the script so GitHub stops billing minutes
+        sys.exit(0)
         
-    # --- LOCAL MODE (Your PC Background Daemon) ---
+    # --- LOCAL MODE (Your Background Machine Daemon) ---
     log_and_print(f"{CYAN}===================================================={RESET}")
-    log_and_print(f"{CYAN}   GEMINI AI FUND MANAGER DAEMON MODE ACTIVATED    {RESET}")
+    log_and_print(f"{CYAN}  GEMINI BARBELL MODEL DAEMON STATUS: OPERATIONAL   {RESET}")
     log_and_print(f"{CYAN}===================================================={RESET}")
     
     SCHEDULE = [
-        {"hour": 8, "minute": 30, "name": "PRE-MARKET"},
-        {"hour": 16, "minute": 15, "name": "AFTER-CLOSE"}
+        {"hour": 13, "minute": 0, "name": "PRE-MARKET"},    # 13:00 UTC = 9:00 AM New York / 10:30 PM Darwin
+        {"hour": 20, "minute": 15, "name": "AFTER-CLOSE"}   # 20:15 UTC = 4:15 PM New York / 5:45 AM Darwin
     ]
     
     last_run_signature = ""
 
     while True:
         try:
-            now_ny = datetime.now(ZoneInfo("America/New_York"))
-            current_date_str = now_ny.strftime('%Y-%m-%d')
+            now_utc = datetime.now(ZoneInfo("UTC"))
+            current_date_str = now_utc.strftime('%Y-%m-%d')
             
-            # 0 = Monday, 4 = Friday.
-            if now_ny.weekday() < 5: 
+            if now_utc.weekday() < 5: 
                 for session in SCHEDULE:
-                    if now_ny.hour == session["hour"] and now_ny.minute == session["minute"]:
+                    if now_utc.hour == session["hour"] and now_utc.minute == session["minute"]:
                         
                         current_signature = f"{current_date_str}-{session['name']}"
                         
                         if last_run_signature != current_signature:
-                            log_and_print(f"{CYAN}[🤖 Autopilot] {session['name']} target time hit! Triggering Matrix...{RESET}")
+                            log_and_print(f"{CYAN}[🤖 Autopilot] UTC Target {session['name']} Hit! Initiating Matrix...{RESET}")
                             send_notification(f"🤖 *Gemini Autopilot:* Launching {session['name']} matrix scan...")
                             
                             portfolio = load_portfolio()
