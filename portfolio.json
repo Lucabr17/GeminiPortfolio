@@ -1,4 +1,69 @@
 {
-    "cash_balance": 50000,
-    "positions": {}
+    "cash_balance": 3500.0,
+    "positions": {
+        "AVGO": {
+            "entry_price": 479.23,
+            "shares": 20.866807169834942,
+            "allocated_capital": 10000.0,
+            "highest_price_seen": 479.23,
+            "strategy_bucket": "CORE",
+            "purchase_date": "2026-06-04"
+        },
+        "NOW": {
+            "entry_price": 117.90000000000002,
+            "shares": 69.97455470737913,
+            "allocated_capital": 8250.0,
+            "highest_price_seen": 117.9,
+            "strategy_bucket": "CORE",
+            "purchase_date": "2026-06-04"
+        },
+        "CRM": {
+            "entry_price": 190.61,
+            "shares": 26.231572320444887,
+            "allocated_capital": 5000.0,
+            "highest_price_seen": 190.61,
+            "strategy_bucket": "CORE",
+            "purchase_date": "2026-06-04"
+        },
+        "MU": {
+            "entry_price": 1079.57,
+            "shares": 6.715636781311078,
+            "allocated_capital": 7250.0,
+            "highest_price_seen": 1079.57,
+            "strategy_bucket": "HIGH_GROWTH",
+            "purchase_date": "2026-06-04"
+        },
+        "ZETA": {
+            "entry_price": 23.27,
+            "shares": 214.86892995272885,
+            "allocated_capital": 5000.0,
+            "highest_price_seen": 23.27,
+            "strategy_bucket": "HIGH_GROWTH",
+            "purchase_date": "2026-06-04"
+        },
+        "AMD": {
+            "entry_price": 542.52,
+            "shares": 9.2162500921625,
+            "allocated_capital": 5000.0,
+            "highest_price_seen": 542.52,
+            "strategy_bucket": "HIGH_GROWTH",
+            "purchase_date": "2026-06-04"
+        },
+        "AXON": {
+            "entry_price": 481.48,
+            "shares": 10.384647337376423,
+            "allocated_capital": 5000.0,
+            "highest_price_seen": 481.48,
+            "strategy_bucket": "HIGH_GROWTH",
+            "purchase_date": "2026-06-04"
+        },
+        "CELH": {
+            "entry_price": 30.01,
+            "shares": 33.322225924691764,
+            "allocated_capital": 1000.0,
+            "highest_price_seen": 30.01,
+            "strategy_bucket": "HIGH_GROWTH",
+            "purchase_date": "2026-06-04"
+        }
+    }
 }
