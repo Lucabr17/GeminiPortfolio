@@ -343,12 +343,13 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix):
     
     try:
         response = ai_client.models.generate_content(
-            model='gemini-2.5-pro', 
+            model='gemini-2.5-flash',  # <--- Change this from 'gemini-2.5-pro'
             contents=system_prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json", 
-                temperature=1.0,
-                thinking_config=types.ThinkingConfig(thinking_level="high")
+                temperature=1.0
+                # Note: Remove the 'thinking_config' line entirely if you switch to Flash, 
+                # as Flash does not use the high-reasoning parameter.
             )
         )
         
