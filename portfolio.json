@@ -1,5 +1,5 @@
 {
-    "cash_balance": 3500.0,
+    "cash_balance": 15250.91200660776,
     "positions": {
         "AVGO": {
             "entry_price": 479.23,
@@ -9,26 +9,10 @@
             "strategy_bucket": "CORE",
             "purchase_date": "2026-06-04"
         },
-        "NOW": {
-            "entry_price": 117.90000000000002,
-            "shares": 69.97455470737913,
-            "allocated_capital": 8250.0,
-            "highest_price_seen": 117.9,
-            "strategy_bucket": "CORE",
-            "purchase_date": "2026-06-04"
-        },
-        "CRM": {
-            "entry_price": 190.61,
-            "shares": 26.231572320444887,
-            "allocated_capital": 5000.0,
-            "highest_price_seen": 190.61,
-            "strategy_bucket": "CORE",
-            "purchase_date": "2026-06-04"
-        },
         "MU": {
-            "entry_price": 1079.57,
-            "shares": 6.715636781311078,
-            "allocated_capital": 7250.0,
+            "entry_price": 1049.5139488922598,
+            "shares": 11.672069735642506,
+            "allocated_capital": 12250.0,
             "highest_price_seen": 1079.57,
             "strategy_bucket": "HIGH_GROWTH",
             "purchase_date": "2026-06-04"
@@ -49,19 +33,11 @@
             "strategy_bucket": "HIGH_GROWTH",
             "purchase_date": "2026-06-04"
         },
-        "AXON": {
-            "entry_price": 481.48,
-            "shares": 10.384647337376423,
-            "allocated_capital": 5000.0,
-            "highest_price_seen": 481.48,
-            "strategy_bucket": "HIGH_GROWTH",
-            "purchase_date": "2026-06-04"
-        },
-        "CELH": {
-            "entry_price": 30.01,
-            "shares": 33.322225924691764,
-            "allocated_capital": 1000.0,
-            "highest_price_seen": 30.01,
+        "COIN": {
+            "entry_price": 163.22,
+            "shares": 16.84842543805906,
+            "allocated_capital": 2750.0,
+            "highest_price_seen": 163.22,
             "strategy_bucket": "HIGH_GROWTH",
             "purchase_date": "2026-06-04"
         }
