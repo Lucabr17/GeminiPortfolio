@@ -1,10 +1,10 @@
 {
-    "cash_balance": 15250.91200660776,
+    "cash_balance": 5491.154073756392,
     "positions": {
         "AVGO": {
-            "entry_price": 479.23,
-            "shares": 20.866807169834942,
-            "allocated_capital": 10000.0,
+            "entry_price": 467.9985996472115,
+            "shares": 25.64110236450683,
+            "allocated_capital": 12000.0,
             "highest_price_seen": 479.23,
             "strategy_bucket": "CORE",
             "purchase_date": "2026-06-04"
@@ -33,12 +33,28 @@
             "strategy_bucket": "HIGH_GROWTH",
             "purchase_date": "2026-06-04"
         },
-        "COIN": {
-            "entry_price": 163.22,
-            "shares": 16.84842543805906,
-            "allocated_capital": 2750.0,
-            "highest_price_seen": 163.22,
+        "CELH": {
+            "entry_price": 27.75,
+            "shares": 54.054054054054056,
+            "allocated_capital": 1500.0,
+            "highest_price_seen": 27.75,
             "strategy_bucket": "HIGH_GROWTH",
+            "purchase_date": "2026-06-04"
+        },
+        "AXON": {
+            "entry_price": 513.2,
+            "shares": 9.791679657053779,
+            "allocated_capital": 5025.09,
+            "highest_price_seen": 513.2,
+            "strategy_bucket": "CORE",
+            "purchase_date": "2026-06-04"
+        },
+        "PLTR": {
+            "entry_price": 141.7,
+            "shares": 28.228652081863093,
+            "allocated_capital": 4000.0,
+            "highest_price_seen": 141.7,
+            "strategy_bucket": "CORE",
             "purchase_date": "2026-06-04"
         }
     }
