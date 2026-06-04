@@ -64,7 +64,7 @@ def send_notification(message):
     if not TELEGRAM_BOT_TOKEN or "YOUR_" in TELEGRAM_BOT_TOKEN:
         log_and_print("Telegram keys missing. Skipping broadcast.")
         return
-    url = f"[https://api.telegram.org/bot](https://api.telegram.org/bot){TELEGRAM_BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     try:
         requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}, timeout=10)
     except Exception as e:
@@ -76,23 +76,23 @@ def get_dynamic_universe():
     tickers = []
     
     try:
-        sp500_url = '[https://en.wikipedia.org/wiki/List_of_S%26P_500_companies](https://en.wikipedia.org/wiki/List_of_S%26P_500_companies)'
+        sp500_url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
         tables = pd.read_html(sp500_url)
         tickers.extend(tables[0]['Symbol'].tolist())
     except: pass
         
     try:
-        ndx_url = '[https://en.wikipedia.org/wiki/Nasdaq-100](https://en.wikipedia.org/wiki/Nasdaq-100)'
+        ndx_url = 'https://en.wikipedia.org/wiki/Nasdaq-100'
         ndx_tables = pd.read_html(ndx_url, match='Ticker|Symbol')
         if 'Ticker' in ndx_tables[0].columns: tickers.extend(ndx_tables[0]['Ticker'].tolist())
         elif 'Symbol' in ndx_tables[0].columns: tickers.extend(ndx_tables[0]['Symbol'].tolist())
     except: pass
 
     try:
-        mdy_tables = pd.read_html('[https://en.wikipedia.org/wiki/List_of_S%26P_400_companies](https://en.wikipedia.org/wiki/List_of_S%26P_400_companies)')
+        mdy_tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_400_companies')
         tickers.extend(mdy_tables[0]['Symbol'].tolist() if 'Symbol' in mdy_tables[0].columns else mdy_tables[0]['Ticker symbol'].tolist())
         
-        spsm_tables = pd.read_html('[https://en.wikipedia.org/wiki/List_of_S%26P_600_companies](https://en.wikipedia.org/wiki/List_of_S%26P_600_companies)')
+        spsm_tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_600_companies')
         tickers.extend(spsm_tables[0]['Symbol'].tolist() if 'Symbol' in spsm_tables[0].columns else spsm_tables[0]['Ticker symbol'].tolist())
     except: pass
 
