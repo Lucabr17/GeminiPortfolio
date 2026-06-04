@@ -301,11 +301,11 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix):
     Active Positions Structural Risk Monitor: {json.dumps(risk_matrix)}
     
     BARBELL MODEL ALLOCATION REQUIREMENTS:
-    1. BUCKET 1: CORE PORTFOLIO (50% Target Weight) -> Execute Claude's Macro Paradigm.
-       Target high-conviction institutional anchors with structural momentum and clear long-term secular trends (Examples: AVGO, MSFT, LLY, VST, NOW). Evaluate macro trends, institutional volume, and fundamental growth durability. You must assign "strategy_bucket": "CORE" to these choices.
+    1. BUCKET 1: CORE PORTFOLIO (50% Target Weight) -> Execute Macro Paradigm.
+       Target high-conviction institutional anchors with structural momentum and clear long-term secular trends (Examples: AVGO, MSFT, LLY, VST, NOW). Evaluate macro trends, institutional volume, and fundamental growth durability. You must assign "strategy_bucket": "CORE".
        
     2. BUCKET 2: HIGH GROWTH PORTFOLIO (50% Target Weight) -> Maintain Our Tactical Tech Framework.
-       Target explosive multi-factor structural dip-buying or velocity setups using the original strategy rules (90-day chart floors, structural technical breakdowns, near-term RSI exhaustion reversals). You must assign "strategy_bucket": "HIGH_GROWTH" to these choices.
+       Target explosive multi-factor structural dip-buying or velocity setups using the original strategy rules (90-day chart floors, structural technical breakdowns, near-term RSI exhaustion reversals). You must assign "strategy_bucket": "HIGH_GROWTH".
        
     3. THE VOLATILITY EXPANSION & ATR RULE (CRITICAL):
        Cross-reference "atr_volatility_pct" with "recent_5d_return_pct" to separate GOOD volatility from BAD volatility.
@@ -318,45 +318,32 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix):
     5. RUTHLESS EXITS:
        If 'algo_risk_status' shows 'PROFIT SECURED' or 'CRITICAL', immediately execute a full SELL to recycle capital back into cash buying power.
 
-    Output strictly in raw JSON format matching the schema array below. No markdown wrappers.
-
-    [
-        {{
-          "action": "BUY",
-          "ticker": "TICKER",
-          "strategy_bucket": "CORE",
-          "allocation_amount": 4000,
-          "analysis_display": "⚡ Core Allocation Sized via ATR Risk Scaling... [DETAILED CLAUDE MACRO/MOMENTUM THESIS]"
-        }},
-        {{
-          "action": "BUY",
-          "ticker": "TICKER",
-          "strategy_bucket": "HIGH_GROWTH",
-          "allocation_amount": 2500,
-          "analysis_display": "🎯 Tactical Tech Buy Sized via High ATR Volatility Constraint... [DETAILED TECHNICAL THESIS]"
-        }},
-        {{
-          "action": "TRIM",
-          "ticker": "TICKER",
-          "strategy_bucket": "CORE",
-          "allocation_amount": 1500,
-          "analysis_display": "✂️ Trimming core winner to harvest liquidity... [RATIONALE]"
-        }},
-        {{
-          "action": "SELL",
-          "ticker": "TICKER",
-          "strategy_bucket": "HIGH_GROWTH",
-          "allocation_amount": "ALL",
-          "analysis_display": "🚨 Risk Threshold Breached... [RATIONALE]"
-        }}
-    ]
+    Output strictly in raw JSON format matching this object structure:
+    {{
+        "trades": [
+            {{
+              "action": "BUY",
+              "ticker": "TICKER",
+              "strategy_bucket": "CORE",
+              "allocation_amount": 4000,
+              "analysis_display": "⚡ Core Allocation Sized via ATR Risk Scaling... [DETAILED MACRO/MOMENTUM THESIS]"
+            }},
+            {{
+              "action": "SELL",
+              "ticker": "TICKER",
+              "strategy_bucket": "HIGH_GROWTH",
+              "allocation_amount": "ALL",
+              "analysis_display": "🚨 Risk Threshold Breached... [RATIONALE]"
+            }}
+        ]
+    }}
     """
     
     log_and_print(f"{YELLOW}[🧠 Gemini] Initiating Barbell Deep Thinking sequence via Google GenAI SDK...{RESET}")
     
     try:
         response = ai_client.models.generate_content(
-            model='gemini-3.1-pro-preview', 
+            model='gemini-2.5-pro', 
             contents=system_prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json", 
@@ -366,17 +353,17 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix):
         )
         
         raw_text = response.text.strip()
+        data = json.loads(raw_text)
         
-        # [NEW PARSER]: Robust JSON extraction using regex
-        json_match = re.search(r'\[.*\]', raw_text, re.DOTALL)
-        
-        if json_match:
-            clean_json = json_match.group(0)
-            return json.loads(clean_json)
+        # Parse the object wrapper safely
+        if isinstance(data, dict) and "trades" in data:
+            return data["trades"]
+        elif isinstance(data, list):
+            return data
         else:
-            log_and_print(f"{YELLOW}[⚠] No actionable JSON array generated by Gemini. Standing by.{RESET}")
+            log_and_print(f"{YELLOW}[⚠] Unexpected JSON structure from Gemini. Raw output: {raw_text}{RESET}")
             return []
-    
+            
     except Exception as e:
         log_and_print(f"{RED}[❌ System] Gemini API Error / Parsing Failure: {e}{RESET}")
         return []
