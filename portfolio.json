@@ -1,22 +1,6 @@
 {
-    "cash_balance": 5491.154073756392,
+    "cash_balance": 4450.342533192531,
     "positions": {
-        "AVGO": {
-            "entry_price": 467.9985996472115,
-            "shares": 25.64110236450683,
-            "allocated_capital": 12000.0,
-            "highest_price_seen": 479.23,
-            "strategy_bucket": "CORE",
-            "purchase_date": "2026-06-04"
-        },
-        "MU": {
-            "entry_price": 1049.5139488922598,
-            "shares": 11.672069735642506,
-            "allocated_capital": 12250.0,
-            "highest_price_seen": 1079.57,
-            "strategy_bucket": "HIGH_GROWTH",
-            "purchase_date": "2026-06-04"
-        },
         "ZETA": {
             "entry_price": 23.27,
             "shares": 214.86892995272885,
@@ -33,29 +17,45 @@
             "strategy_bucket": "HIGH_GROWTH",
             "purchase_date": "2026-06-04"
         },
-        "CELH": {
-            "entry_price": 27.75,
-            "shares": 54.054054054054056,
-            "allocated_capital": 1500.0,
-            "highest_price_seen": 27.75,
+        "LLY": {
+            "entry_price": 1131.42,
+            "shares": 13.32826006257623,
+            "allocated_capital": 15079.86,
+            "highest_price_seen": 1131.42,
+            "strategy_bucket": "CORE",
+            "purchase_date": "2026-06-05"
+        },
+        "MSFT": {
+            "entry_price": 416.67,
+            "shares": 19.19984640122879,
+            "allocated_capital": 8000.0,
+            "highest_price_seen": 416.67,
+            "strategy_bucket": "CORE",
+            "purchase_date": "2026-06-05"
+        },
+        "COIN": {
+            "entry_price": 152.4,
+            "shares": 39.57965879265092,
+            "allocated_capital": 6031.94,
+            "highest_price_seen": 152.4,
             "strategy_bucket": "HIGH_GROWTH",
-            "purchase_date": "2026-06-04"
+            "purchase_date": "2026-06-05"
         },
-        "AXON": {
-            "entry_price": 513.2,
-            "shares": 9.791679657053779,
-            "allocated_capital": 5025.09,
-            "highest_price_seen": 513.2,
-            "strategy_bucket": "CORE",
-            "purchase_date": "2026-06-04"
+        "SHOP": {
+            "entry_price": 109.54,
+            "shares": 9.177651999269672,
+            "allocated_capital": 1005.32,
+            "highest_price_seen": 109.54,
+            "strategy_bucket": "HIGH_GROWTH",
+            "purchase_date": "2026-06-05"
         },
-        "PLTR": {
-            "entry_price": 141.7,
-            "shares": 28.228652081863093,
-            "allocated_capital": 4000.0,
-            "highest_price_seen": 141.7,
-            "strategy_bucket": "CORE",
-            "purchase_date": "2026-06-04"
+        "HOOD": {
+            "entry_price": 82.47,
+            "shares": 12.190129744149388,
+            "allocated_capital": 1005.32,
+            "highest_price_seen": 82.47,
+            "strategy_bucket": "HIGH_GROWTH",
+            "purchase_date": "2026-06-05"
         }
     }
 }

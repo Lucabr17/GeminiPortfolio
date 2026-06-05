@@ -221,3 +221,79 @@ Rationale: ⚡ Core Allocation: PLTR selected as a macro paradigm play, reflecti
 2026-06-05 15:49:43,827 | [❌ System] Gemini API Error / Parsing Failure: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}
 2026-06-05 15:49:43,828 | [⚠] No actions returned by Gemini.
 2026-06-05 15:49:43,828 | [✓] Cloud matrix cycle complete. Shutting down server.
+2026-06-05 21:45:45,838 | [⚙️ Cloud] Triggering standalone strategic matrix execution...
+2026-06-05 21:45:46,283 | [⚙️ System] Fetching massive live universe (S&P 500, Nasdaq 100, Mid/Small Caps)...
+2026-06-05 21:45:46,637 | [✓] Total unique assets loaded into matrix: 17
+2026-06-05 21:45:46,637 | [⚙️ Matrix] Running Stage 1 Fast-Scan on 17 assets...
+2026-06-05 21:45:46,638 | Failed to create TzCache, reason: Error creating TzCache folder: '/home/runner/.cache/py-yfinance' reason: [Errno 17] File exists: '/home/runner/.cache/py-yfinance'. TzCache will not be used. Tip: You can direct cache to use a different location with 'set_tz_cache_location(mylocation)'
+2026-06-05 21:45:49,808 | [⚙️ Matrix] Stage 2 Deep-Dive Structural Analysis on 16 filtered assets...
+2026-06-05 21:45:56,521 | [🧠 Gemini] Initiating Barbell Deep Thinking sequence via Google GenAI SDK...
+2026-06-05 21:45:56,522 | AFC is enabled with max remote calls: 10.
+2026-06-05 21:47:02,077 | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-06-05 21:47:02,078 | 🔴 *GEMINI EXECUTION: FULL SELL AVGO [CORE]*
+
+Proceeds: $9890.54
+Rationale: 🚨 Risk Threshold Breached: Hard Stop Hit (-15%). Recycling capital.
+2026-06-05 21:47:02,541 | 🔴 *GEMINI EXECUTION: FULL SELL MU [HIGH_GROWTH]*
+
+Proceeds: $10084.78
+Rationale: 🚨 Risk Threshold Breached: Hard Stop Hit (-15%). Recycling capital.
+2026-06-05 21:47:02,995 | 🔴 *GEMINI EXECUTION: FULL SELL CELH [HIGH_GROWTH]*
+
+Proceeds: $1520.54
+Rationale: 🚨 Risk Threshold Breached: 200-Day Structural Breakdown Verified. Recycling capital.
+2026-06-05 21:47:03,461 | 🔴 *GEMINI EXECUTION: FULL SELL AXON [CORE]*
+
+Proceeds: $4759.93
+Rationale: 🚨 Risk Threshold Breached: 200-Day Structural Breakdown Verified. Recycling capital.
+2026-06-05 21:47:03,907 | 🔴 *GEMINI EXECUTION: FULL SELL PLTR [CORE]*
+
+Proceeds: $3825.83
+Rationale: 🚨 Risk Threshold Breached: 200-Day Structural Breakdown Verified. Recycling capital.
+2026-06-05 21:47:04,367 | 🟢 *GEMINI EXECUTION: BUY LLY [CORE]*
+
+Allocated: $5026.62
+Shares: 4.4428 @ $1131.42
+Rationale: ⚡ Core Allocation Sized for strong macro compounder with durable growth, positive momentum, and good volatility. Overbought RSI but allowed for trend maximization.
+2026-06-05 21:47:04,828 | 🟢 *GEMINI EXECUTION: BUY MSFT [CORE]*
+
+Allocated: $4000.0
+Shares: 9.5999 @ $416.67
+Rationale: ⚡ Core Allocation Sized as institutional anchor, taking advantage of a dip. Low volatility suggests a stable entry despite being moderately below SMA200.
+2026-06-05 21:47:05,275 | 🟢 *GEMINI EXECUTION: BUY LLY [CORE]*
+
+Allocated: $5026.62
+Shares: 4.4428 @ $1131.42
+Rationale: ⚡ Core Allocation Sized for strong macro compounder with durable growth, positive momentum, and good volatility. Overbought RSI but allowed for trend maximization.
+2026-06-05 21:47:05,733 | 🟢 *GEMINI EXECUTION: BUY MSFT [CORE]*
+
+Allocated: $4000.0
+Shares: 9.5999 @ $416.67
+Rationale: ⚡ Core Allocation Sized as institutional anchor, taking advantage of a dip. Low volatility suggests a stable entry despite being moderately below SMA200.
+2026-06-05 21:47:06,207 | 🟢 *GEMINI EXECUTION: BUY LLY [CORE]*
+
+Allocated: $5026.62
+Shares: 4.4428 @ $1131.42
+Rationale: ⚡ Core Allocation Sized for strong macro compounder with durable growth, positive momentum, and good volatility. Overbought RSI but allowed for trend maximization.
+2026-06-05 21:47:06,657 | 🟢 *GEMINI EXECUTION: BUY COIN [HIGH_GROWTH]*
+
+Allocated: $1005.32
+Shares: 6.5966 @ $152.4
+Rationale: ⚡ High Growth Allocation Sized via ATR Risk Scaling for structural dip-buying setup. Deep structural breakdown, near 90d floor, and extreme RSI oversold condition. Scaled down due to high ATR and negative recent returns.
+2026-06-05 21:47:07,139 | 🟢 *GEMINI EXECUTION: BUY SHOP [HIGH_GROWTH]*
+
+Allocated: $1005.32
+Shares: 9.1777 @ $109.54
+Rationale: ⚡ High Growth Allocation Sized via ATR Risk Scaling for structural dip-buying opportunity. Below SMA200 and near 90-day floor, scaled down due to negative returns.
+2026-06-05 21:47:07,591 | 🟢 *GEMINI EXECUTION: BUY HOOD [HIGH_GROWTH]*
+
+Allocated: $1005.32
+Shares: 12.1901 @ $82.47
+Rationale: ⚡ High Growth Allocation Sized via ATR Risk Scaling for structural dip-buying opportunity. Below SMA200 with high ATR and negative returns, scaled down.
+2026-06-05 21:47:08,034 | 🟢 *GEMINI EXECUTION: BUY COIN [HIGH_GROWTH]*
+
+Allocated: $5026.62
+Shares: 32.9831 @ $152.4
+Rationale: ⚡ High Growth Allocation Sized to balance bucket allocation leveraging strong structural dip-buying signals (RSI exhaustion, near 90d floor, deep breakdown) while managing bad volatility.
+2026-06-05 21:47:08,514 | [✓] Barbell Portfolio balanced and committed to disk. Current Cash: $4450.34
+2026-06-05 21:47:08,514 | [✓] Cloud matrix cycle complete. Shutting down server.
