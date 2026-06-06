@@ -5,7 +5,8 @@ import time
 import logging
 import re
 import pandas as pd
-from datetime import datetime, time as datetime_time
+import numpy as np
+from datetime import datetime
 from zoneinfo import ZoneInfo
 import requests
 import yfinance as yf
@@ -13,7 +14,6 @@ from google import genai
 from google.genai import types
 import warnings
 
-# Suppress pandas warnings for a clean terminal output
 warnings.filterwarnings('ignore')
 
 # ==========================================
@@ -26,7 +26,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "YOUR_TELEGRAM_CHAT_ID")
 logging.basicConfig(
     filename='agent.log', 
     level=logging.INFO, 
-    format='%(asctime)s | %(message)s'
+    format='%(asctime)s | %(levelname)s | %(message)s'
 )
 
 def log_and_print(message):
@@ -34,11 +34,11 @@ def log_and_print(message):
     clean_msg = re.sub(r'\033\[[0-9;]*m', '', message)
     logging.info(clean_msg)
 
-# Initialize Gemini Client
 try:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
 except Exception as e:
-    log_and_print(f"Warning: Gemini Client failed to initialize. Check API Key. Error: {e}")
+    log_and_print(f"CRITICAL: Gemini Client failed to initialize: {e}")
+    sys.exit(1)
 
 GREEN = "\033[1;32m"
 RED = "\033[1;31m"
@@ -47,14 +47,14 @@ YELLOW = "\033[1;33m"
 RESET = "\033[0m"
 
 # ==========================================
-# 2. PORTFOLIO MEMORY & 1000+ ASSET UNIVERSE
+# 2. PORTFOLIO & MARKET REGIME
 # ==========================================
 def load_portfolio():
     try:
         with open("portfolio.json", "r") as f:
             return json.load(f)
     except FileNotFoundError:
-        return {"cash_balance": 50000.0, "positions": {}}
+        return {"cash_balance": 100000.0, "positions": {}}
 
 def save_portfolio(data):
     with open("portfolio.json", "w") as f:
@@ -62,461 +62,397 @@ def save_portfolio(data):
 
 def send_notification(message):
     if not TELEGRAM_BOT_TOKEN or "YOUR_" in TELEGRAM_BOT_TOKEN:
-        log_and_print("Telegram keys missing. Skipping broadcast.")
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     try:
         requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}, timeout=10)
     except Exception as e:
-        log_and_print(f"Failed to transmit alert: {e}")
+        log_and_print(f"Telegram notification failed: {e}")
 
-def get_dynamic_universe():
-    """Scrapes S&P 500, Nasdaq 100, and Top Small/Mid Caps (Russell 2000 proxy)."""
-    log_and_print(f"{CYAN}[⚙️ System] Fetching massive live universe (S&P 500, Nasdaq 100, Mid/Small Caps)...{RESET}")
-    tickers = []
+def get_macro_universe():
+    """Fetches S&P500 + Nasdaq 100 + Strategic Alpha Overlays."""
+    tickers = set()
+    log_and_print(f"{CYAN}[🌐 Universe] Compiling macro universe...{RESET}")
     
     try:
-        sp500_url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-        tables = pd.read_html(sp500_url)
-        tickers.extend(tables[0]['Symbol'].tolist())
-    except: pass
-        
-    try:
-        ndx_url = 'https://en.wikipedia.org/wiki/Nasdaq-100'
-        ndx_tables = pd.read_html(ndx_url, match='Ticker|Symbol')
-        if 'Ticker' in ndx_tables[0].columns: tickers.extend(ndx_tables[0]['Ticker'].tolist())
-        elif 'Symbol' in ndx_tables[0].columns: tickers.extend(ndx_tables[0]['Symbol'].tolist())
-    except: pass
+        sp500 = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]['Symbol'].tolist()
+        tickers.update(sp500)
+    except Exception as e:
+        log_and_print(f"Warning: Failed to fetch S&P 500. {e}")
 
     try:
-        mdy_tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_400_companies')
-        tickers.extend(mdy_tables[0]['Symbol'].tolist() if 'Symbol' in mdy_tables[0].columns else mdy_tables[0]['Ticker symbol'].tolist())
-        
-        spsm_tables = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_600_companies')
-        tickers.extend(spsm_tables[0]['Symbol'].tolist() if 'Symbol' in spsm_tables[0].columns else spsm_tables[0]['Ticker symbol'].tolist())
-    except: pass
+        ndx_tables = pd.read_html('https://en.wikipedia.org/wiki/Nasdaq-100', match='Ticker|Symbol')
+        ndx_col = 'Ticker' if 'Ticker' in ndx_tables[0].columns else 'Symbol'
+        tickers.update(ndx_tables[0][ndx_col].tolist())
+    except Exception as e:
+        log_and_print(f"Warning: Failed to fetch Nasdaq 100. {e}")
+
+    strategic_alpha = ["NOW", "SHOP", "AXON", "SNOW", "CRM", "PLTR", "AMD", "QCOM", "MU", "ZETA", "COIN", "HOOD", "VST", "CELH", "AVGO", "MSFT", "LLY"]
+    tickers.update(strategic_alpha)
 
     cleaned_tickers = [str(t).replace('.', '-') for t in tickers if isinstance(t, str)]
-    
-    strategic_alpha = ["NOW", "SHOP", "AXON", "SNOW", "CRM", "PLTR", "AMD", "QCOM", "MU", "ZETA", "COIN", "HOOD", "VST", "CELH", "AVGO", "MSFT", "LLY"]
-    cleaned_tickers.extend(strategic_alpha)
-    
-    final_universe = list(set(cleaned_tickers))
-    log_and_print(f"{GREEN}[✓] Total unique assets loaded into matrix: {len(final_universe)}{RESET}")
-    return final_universe
+    log_and_print(f"{CYAN}[🌐 Universe] Total tracked equities: {len(cleaned_tickers)}{RESET}")
+    return list(set(cleaned_tickers))
+
+def check_market_regime():
+    """Checks if the broader market is in a structural correction (>5% drawdown)."""
+    log_and_print(f"{CYAN}[🔍 Regime] Assessing broader market drawdown levels...{RESET}")
+    try:
+        spy = yf.Ticker("^GSPC").history(period="60d")
+        if spy.empty: 
+            return False, 0.0
+            
+        high_60d = spy['High'].max()
+        current_close = spy['Close'].iloc[-1]
+        drawdown_pct = ((high_60d - current_close) / high_60d) * 100
+        
+        is_correction = drawdown_pct >= 5.0
+        log_and_print(f"{CYAN}[🔍 Regime] S&P 500 Drawdown: {round(drawdown_pct, 2)}% | Correction Mode: {is_correction}{RESET}")
+        return is_correction, drawdown_pct
+    except Exception as e:
+        log_and_print(f"Warning: Failed to check market regime. Defaulting to safe mode. {e}")
+        return False, 0.0
 
 # ==========================================
-# 3. FAST SCAN & DEEP DIVE MATRICES (WITH ATR ENGINE)
+# 3. INSTITUTIONAL QUALITY SCREENER
 # ==========================================
-def compute_rsi(prices, period=14):
-    if len(prices) < period + 1: return 50
-    deltas = prices.diff().dropna()
-    gains = deltas.clip(lower=0)
-    losses = -deltas.clip(upper=0)
-    avg_gain = gains.rolling(window=period).mean()
-    avg_loss = losses.rolling(window=period).mean()
-    rs = avg_gain.iloc[-1] / (avg_loss.iloc[-1] + 1e-9)
-    return 100 - (100 / (1 + rs))
-
-def compute_atr_pct(df, period=14):
-    """Calculates Average True Range as a percentage of the current stock price for volatility sizing."""
-    if len(df) < period + 1: return 4.0  # Default fallback volatility proxy
-    high = df['High']
-    low = df['Low']
-    close_prev = df['Close'].shift(1)
-    
-    tr1 = high - low
-    tr2 = (high - close_prev).abs()
-    tr3 = (low - close_prev).abs()
-    
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    atr = tr.rolling(window=period).mean().iloc[-1]
-    current_price = df['Close'].iloc[-1]
-    
-    return round((atr / current_price) * 100, 2) if current_price > 0 else 4.0
-
-def run_two_stage_screener(tickers):
-    log_and_print(f"{CYAN}[⚙️ Matrix] Running Stage 1 Fast-Scan on {len(tickers)} assets...{RESET}")
-    
-    fast_data = yf.download(tickers, period="30d", interval="1d", group_by='ticker', progress=False)
-    fast_candidates = []
+def run_macro_screener(tickers):
+    """
+    Quality Growth + 200-Week EMA Institutional Support Matrix.
+    Prioritizes wide moats trading near historic structural baselines.
+    """
+    log_and_print(f"{CYAN}[⚙️ Matrix] Running institutional quality and 200-Week EMA screener...{RESET}")
+    scored_candidates = {}
     
     for ticker in tickers:
         try:
-            td = fast_data[ticker] if len(tickers) > 1 else fast_data
-            if td.empty or len(td) < 20: continue
+            ticker_obj = yf.Ticker(ticker)
+            daily_hist = ticker_obj.history(period="250d")
+            if daily_hist.empty or len(daily_hist) < 200: continue
             
-            c_price = td['Close'].iloc[-1]
-            mom_5d = ((c_price - td['Close'].iloc[-5]) / td['Close'].iloc[-5]) * 100
+            d_closes = daily_hist['Close']
+            current_price = float(d_closes.iloc[-1])
+            sma_200 = float(d_closes.iloc[-200:].mean())
+
+            info = ticker_obj.info
+            roe = info.get('returnOnEquity') or 0
+            rev_growth = info.get('revenueGrowth') or 0
+            fwd_pe = info.get('forwardPE') or 0
+            operating_cash = info.get('operatingCashflow') or 0
             
-            avg_vol = td['Volume'].iloc[-21:-1].mean()
-            vol_ratio = td['Volume'].iloc[-1] / avg_vol if avg_vol > 0 else 1
+            # Strict Baseline Quality Filter
+            if roe < 0.12 or operating_cash <= 0 or rev_growth <= 0:
+                continue
+
+            # Calculate 200-Week EMA
+            weekly_hist = ticker_obj.history(period="5y", interval="1wk")
+            if len(weekly_hist) < 200: continue
+            w_closes = weekly_hist['Close'].dropna()
             
-            if vol_ratio > 1.20 or mom_5d > 3.0 or mom_5d < -5.0:
-                fast_candidates.append(ticker)
-        except: continue
+            ema_200_series = w_closes.ewm(span=200, adjust=False).mean()
+            current_w_ema200 = float(ema_200_series.iloc[-1])
             
-    log_and_print(f"{CYAN}[⚙️ Matrix] Stage 2 Deep-Dive Structural Analysis on {len(fast_candidates)} filtered assets...{RESET}")
-    
-    deep_data = yf.download(fast_candidates, period="250d", interval="1d", group_by='ticker', progress=False)
-    scored_candidates = {}
-    
-    for ticker in fast_candidates:
-        try:
-            td = deep_data[ticker] if len(fast_candidates) > 1 else deep_data
-            if td.empty or len(td) < 200: continue
-                
-            closes = td['Close']
-            current_price = round(closes.iloc[-1], 2)
-            
-            sma_50 = closes.iloc[-50:].mean()
-            sma_200 = closes.iloc[-200:].mean()
-            dist_sma50 = ((current_price - sma_50) / sma_50) * 100
-            dist_sma200 = ((current_price - sma_200) / sma_200) * 100
-            
-            low_90d = td['Low'].iloc[-90:].min()
-            dist_from_90d_floor = ((current_price - low_90d) / low_90d) * 100
-            rsi = compute_rsi(closes)
-            atr_volatility_pct = compute_atr_pct(td)
-            
-            # Contextual Directional Component: Measure performance over the last 5 days
-            mom_5d = ((current_price - closes.iloc[-5]) / closes.iloc[-5]) * 100
-            
-            try:
-                info = yf.Ticker(ticker).info
-                fwd_pe = info.get('forwardPE', 0) or 0
-                rev_growth = info.get('revenueGrowth', 0) or 0
-            except:
-                fwd_pe, rev_growth = 0, 0
+            # Check proximity to 200-Week EMA (Within 4% above or 2% below)
+            price_to_ema_ratio = current_price / current_w_ema200
+            is_touching_weekly_ema200 = (0.98 <= price_to_ema_ratio <= 1.04)
 
             score = 0
-            if rsi < 40: score += 25                      
-            if dist_sma200 > -2: score += 15              
-            if 0 < dist_from_90d_floor < 10: score += 25  
-            if rsi > 55 and mom_5d > 4: score += 20 
-            if rev_growth > 0.15: score += 15
-            if 0 < fwd_pe < 25: score += 10
+            setup_tag = "Standard Trend Growth"
+            
+            if is_touching_weekly_ema200:
+                score += 50
+                setup_tag = "GENERATIONAL 200-WEEK EMA SUPPORT"
+            elif current_price > sma_200:
+                score += 20  
+                
+            if roe >= 0.22: score += 15
+            if rev_growth >= 0.15: score += 15
+            if 0 < fwd_pe <= 35: score += 10
 
-            scored_candidates[ticker] = {
-                "price": current_price,
-                "composite_alpha_score": score,
-                "dist_sma50_pct": round(dist_sma50, 2),
-                "dist_sma200_pct": round(dist_sma200, 2),
-                "dist_from_90d_floor_pct": round(dist_from_90d_floor, 2),
-                "rsi_14d": round(rsi, 2),
-                "forward_pe": round(fwd_pe, 2),
-                "rev_growth_pct": round(rev_growth * 100, 2),
-                "atr_volatility_pct": atr_volatility_pct,
-                "recent_5d_return_pct": round(mom_5d, 2)
-            }
-        except: continue
+            if score >= 40:
+                scored_candidates[ticker] = {
+                    "price": round(current_price, 2),
+                    "macro_score": score,
+                    "setup_type": setup_tag,
+                    "weekly_ema_200": round(current_w_ema200, 2),
+                    "return_on_equity_pct": round(roe * 100, 2),
+                    "rev_growth_pct": round(rev_growth * 100, 2),
+                    "forward_pe": round(fwd_pe, 2) if fwd_pe else "N/A"
+                }
+            time.sleep(0.05)
+        except:
+            continue
 
-    return dict(sorted(scored_candidates.items(), key=lambda x: x[1]['composite_alpha_score'], reverse=True)[:15])
+    return dict(sorted(scored_candidates.items(), key=lambda x: x[1]['macro_score'], reverse=True)[:12])
 
 # ==========================================
-# 4. INSTITUTIONAL RISK MATRIX (NO STUPID SELLS)
+# 4. LIVING FUNDAMENTAL RISK MONITOR (WITH MACD)
 # ==========================================
 def evaluate_open_positions(portfolio):
+    """
+    Monitors structural integrity. Allows winners to run unchecked unless 
+    technical or fundamental pillars fail. Uses Weekly MACD to spot bullish divergences.
+    """
     risk_matrix = {}
-    now_ny = datetime.now(ZoneInfo("America/New_York")).date()
+    positions_value = 0
+    temp_prices = {}
     
-    for ticker, pos_data in portfolio.get("positions", {}).items():
+    log_and_print(f"{YELLOW}[📊 Audit] Evaluating structural trend and MACD momentum for portfolio holdings...{RESET}")
+    
+    for pos_key, pos_data in portfolio.get("positions", {}).items():
+        ticker = pos_key.split('_')[0]
         try:
-            hist = yf.Ticker(ticker).history(period="250d")
-            if hist.empty or len(hist) < 200: continue
+            current_price = float(yf.Ticker(ticker).history(period="5d")['Close'].iloc[-1])
+            temp_prices[pos_key] = current_price
+            positions_value += pos_data["shares"] * current_price
+        except:
+            temp_prices[pos_key] = pos_data["entry_price"]
+            positions_value += pos_data["allocated_capital"]
+
+    total_nav = portfolio["cash_balance"] + positions_value
+    
+    for pos_key, pos_data in portfolio.get("positions", {}).items():
+        ticker = pos_key.split('_')[0]
+        current_price = temp_prices[pos_key]
+        current_weight = (pos_data["shares"] * current_price) / total_nav
+        pnl_pct = ((current_price - pos_data["entry_price"]) / pos_data["entry_price"]) * 100
+        
+        try:
+            ticker_obj = yf.Ticker(ticker)
             
-            closes = hist['Close']
-            current_price = round(closes.iloc[-1], 2)
-            entry_price = pos_data["entry_price"]
-            strategy_bucket = pos_data.get("strategy_bucket", "HIGH_GROWTH")
+            # Daily Technicals
+            hist_d = ticker_obj.history(period="250d")
+            closes = hist_d['Close']
+            sma_50 = float(closes.iloc[-50:].mean())
+            sma_200 = float(closes.iloc[-200:].mean())
+            mom_60d = ((current_price - float(closes.iloc[-60])) / float(closes.iloc[-60])) * 100
             
-            highest_price = pos_data.get("highest_price_seen", entry_price)
-            if current_price > highest_price:
-                highest_price = current_price
-                pos_data["highest_price_seen"] = highest_price 
+            # Fundamentals
+            info = ticker_obj.info
+            live_rev_growth = info.get('revenueGrowth', 0) or 0
+            
+            # Weekly Technicals (200-Week EMA & MACD)
+            hist_w = ticker_obj.history(period="5y", interval="1wk")
+            w_closes = hist_w['Close'].dropna()
+            
+            ema_200_w = w_closes.ewm(span=200, adjust=False).mean()
+            current_w_ema200 = float(ema_200_w.iloc[-1])
+            
+            # MACD Calculation
+            ema_12 = w_closes.ewm(span=12, adjust=False).mean()
+            ema_26 = w_closes.ewm(span=26, adjust=False).mean()
+            macd_line = ema_12 - ema_26
+            signal_line = macd_line.ewm(span=9, adjust=False).mean()
+            macd_hist = macd_line - signal_line
+            
+            current_hist = macd_hist.iloc[-1]
+            prev_hist = macd_hist.iloc[-2]
+            
+            # Evaluate Exit Signals
+            risk_status = "HEALTHY RUNNER: Structural momentum intact. Do not touch."
+            
+            # 1. Emergency 200-Week Breakdown Check (10%+ drop)
+            if current_price < (current_w_ema200 * 0.90):
+                if current_hist < prev_hist:
+                    risk_status = "CRITICAL WEEKLY BREAKDOWN: Price >10% below 200W EMA & MACD momentum worsening. EMERGENCY SELL."
+                else:
+                    risk_status = "DEEP DRAWDOWN WITH BULLISH DIVERGENCE: Price >10% below 200W EMA, but MACD histogram is rising. HOLD."
+            
+            # 2. Standard Daily Rules
+            elif current_price < sma_200 and current_price >= (current_w_ema200 * 0.90):
+                risk_status = "STRUCTURAL CAUTION: Price below 200-day SMA, but holding above extreme weekly breakdown levels. Potential Trim."
+            elif current_price < sma_50 and mom_60d < -12:
+                risk_status = "TAILWINDS FADING: Asset experiencing severe intermediate momentum loss. Potential Trim."
+            elif live_rev_growth <= 0:
+                risk_status = "FUNDAMENTAL REVERSAL: Quarterly revenue growth has flattened or turned negative. SELL."
                 
-            purchase_date = datetime.strptime(pos_data["purchase_date"], '%Y-%m-%d').date()
-            days_held = (now_ny - purchase_date).days
-            
-            pnl_pct = ((current_price - entry_price) / entry_price) * 100
-            drawdown_from_peak = ((highest_price - current_price) / highest_price) * 100
-            
-            sma_200 = closes.iloc[-200:].mean()
-            dist_sma200 = ((current_price - sma_200) / sma_200) * 100
-            
-            risk_status = "SAFE - LET RUN"
-            
-            if highest_price > (entry_price * 1.15): 
-                if drawdown_from_peak > 15.0:
-                    risk_status = "PROFIT SECURED: 15% Trailing Stop Triggered"
-            elif pnl_pct < -15.0:
-                risk_status = "CRITICAL: Hard Stop Hit (-15%)"
-            elif dist_sma200 < -8.0:
-                risk_status = "CRITICAL: 200-Day Structural Breakdown Verified"
-                
-            risk_matrix[ticker] = {
-                "days_held": days_held,
-                "current_price": current_price,
+            risk_matrix[pos_key] = {
+                "ticker": ticker,
+                "current_weight_pct": round(current_weight * 100, 2),
                 "pnl_pct": round(pnl_pct, 2),
-                "peak_profit_pct": round(((highest_price - entry_price) / entry_price) * 100, 2),
-                "dist_sma200_pct": round(dist_sma200, 2),
                 "algo_risk_status": risk_status,
-                "strategy_bucket": strategy_bucket
+                "live_rev_growth_pct": round(live_rev_growth * 100, 2),
+                "original_buying_thesis": pos_data.get("buying_thesis", "N/A")
             }
-        except: continue
+        except Exception as e:
+            log_and_print(f"Warning: Failed to evaluate {ticker}. {e}")
+            continue
             
-    return risk_matrix
+    return risk_matrix, total_nav
 
 # ==========================================
-# 5. EXECUTION BRAIN & PORTFOLIO UPDATE
+# 5. EXECUTION BRAIN & TRADE LOGIC
 # ==========================================
-def query_gemini_brain(buy_candidates, portfolio, risk_matrix):
-    total_nav = portfolio["cash_balance"] + sum(p["allocated_capital"] for p in portfolio["positions"].values())
-    cash_ratio = portfolio["cash_balance"] / total_nav if total_nav > 0 else 1.0
-    
-    core_allocated = sum(p["allocated_capital"] for p in portfolio["positions"].values() if p.get("strategy_bucket") == "CORE")
-    growth_allocated = sum(p["allocated_capital"] for p in portfolio["positions"].values() if p.get("strategy_bucket") == "HIGH_GROWTH")
-    
-    min_allocation = round(total_nav * 0.02, 2)
-    max_allocation = round(total_nav * 0.10, 2)
-    cash_threshold = round(total_nav * 0.07, 2)
-    
+def consolidate_decisions(decisions):
+    consolidated = {}
+    for d in decisions:
+        ticker = d.get("ticker", "").upper()
+        action = d.get("action", "").upper()
+        bucket = d.get("strategy_bucket", "MACRO_SWING").upper()
+        
+        if not ticker or action == "HOLD":
+            continue
+            
+        if action == "BUY":
+            unique_key = f"{ticker}_BUY_{bucket}"
+            if unique_key not in consolidated:
+                consolidated[unique_key] = d
+            else:
+                consolidated[unique_key]["allocation_amount"] = float(consolidated[unique_key].get("allocation_amount", 0)) + float(d.get("allocation_amount", 0))
+        else:
+            unique_key = f"{ticker}_{action}_{bucket}_{len(consolidated)}"
+            consolidated[unique_key] = d
+                
+    return list(consolidated.values())
+
+def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_correction):
     system_prompt = f"""
-    You are an elite hedge fund portfolio manager executing a 50/50 BARBELL ASSET ALLOCATION STRATEGY.
-    Your mission is to balance slow, macroeconomic foundational compounders with high-velocity alpha setups.
-    
-    PORTFOLIO LEDGER CONTEXT:
-    * Total Account NAV: ${round(total_nav, 2)}
-    * Free Investable Cash: ${round(portfolio["cash_balance"], 2)} (Ratio: {round(cash_ratio * 100, 2)}%)
-    * Core Bucket Allocation: ${round(core_allocated, 2)} / Target: ${round(total_nav * 0.50, 2)} (50%)
-    * High Growth Bucket Allocation: ${round(growth_allocated, 2)} / Target: ${round(total_nav * 0.50, 2)} (50%)
-    
-    RISK SIZING LIMITS:
-    * Min Target Single Position: ${min_allocation}
-    * Max Target Single Position: ${max_allocation}
-    * Emergency Liquidity Threshold: ${cash_threshold}
-    
-    Active Allocation Manifest: {json.dumps(portfolio)}
-    Top Available Candidates Matrix (Includes Metrics, ATR %, and 5-Day Returns): {json.dumps(buy_candidates)}
-    Active Positions Structural Risk Monitor: {json.dumps(risk_matrix)}
-    
-    BARBELL MODEL ALLOCATION REQUIREMENTS:
-    1. BUCKET 1: CORE PORTFOLIO (50% Target Weight) -> Execute Macro Paradigm.
-       Target high-conviction institutional anchors with structural momentum and clear long-term secular trends (Examples: AVGO, MSFT, LLY, VST, NOW). Evaluate macro trends, institutional volume, and fundamental growth durability. You must assign "strategy_bucket": "CORE".
-       
-    2. BUCKET 2: HIGH GROWTH PORTFOLIO (50% Target Weight) -> Maintain Our Tactical Tech Framework.
-       Target explosive multi-factor structural dip-buying or velocity setups using the original strategy rules (90-day chart floors, structural technical breakdowns, near-term RSI exhaustion reversals). You must assign "strategy_bucket": "HIGH_GROWTH".
-       
-    3. THE VOLATILITY EXPANSION & ATR RULE (CRITICAL):
-       Cross-reference "atr_volatility_pct" with "recent_5d_return_pct" to separate GOOD volatility from BAD volatility.
-       * GOOD VOLATILITY (UPSIDE MOMENTUM BREAKOUTS): If a stock has a high ATR (>5%) but its "recent_5d_return_pct" is strongly positive, or it jumped 6-9% in a day, this is a bullish breakout. NEVER trim or sell an asset solely because it has high upside volatility or huge green days. Let winners run and maximize the trend! You can size these up safely.
-       * BAD VOLATILITY (CHOP / RISK): Only scale down your buy sizes toward the minimum threshold (${min_allocation}) if the high ATR is accompanied by negative or directionless, choppy price returns.
-       
-    4. CAPITAL REALLOCATION VIA TRIMS:
-       If Free Cash drops beneath the low cash threshold (${cash_threshold}) and you need to fund a perfect high-scoring opportunity to correct a bucket imbalance, you are authorized to issue a "TRIM" order to capture partial gains ONLY from assets that are extended and showing signs of momentum exhaustion—NEVER trim a fresh breakout.
-       
-    5. RUTHLESS EXITS:
-       If 'algo_risk_status' shows 'PROFIT SECURED' or 'CRITICAL', immediately execute a full SELL to recycle capital back into cash buying power.
+    You are an aggressive Institutional Quality Growth portfolio manager. Your operational mandate is to ride high-conviction structural trends and let winning positions compound without artificial size limitations.
 
-    Output strictly in raw JSON format matching this object structure:
+    PORTFOLIO OPERATIONAL STATUS:
+    * Current Estimated Portfolio NAV: ${round(total_nav, 2)}
+    * Available Execution Cash: ${round(portfolio["cash_balance"], 2)}
+    * BROADER MARKET CORRECTION ACTIVE: {is_correction}
+    
+    Active Positions Risk Registry: {json.dumps(risk_matrix)}
+    Top Quant-Filtered Growth Opportunities: {json.dumps(buy_candidates)}
+    
+    SYSTEM TRADING PROTOCOLS:
+    1. RUN THE WINNERS: Ignore how large an asset's 'current_weight_pct' is. You are forbidden from trimming an asset simply because it is large or up significantly. Let it run completely unchecked.
+    2. TECHNICAL/FUNDAMENTAL EXITS: You should only order a 'SELL' or 'TRIM' if an asset's 'algo_risk_status' explicitly notes a 'CRITICAL WEEKLY BREAKDOWN', 'FUNDAMENTAL REVERSAL', or requests a 'Potential Trim'. 
+    3. RESPECT DIVERGENCES: If a status reads 'DEEP DRAWDOWN WITH BULLISH DIVERGENCE', you MUST output 'HOLD'.
+    4. CAPITAL DEPLOYMENT: Standard initial position allocation is ~10% of total NAV. Prioritize companies highlighted with the tag 'GENERATIONAL 200-WEEK EMA SUPPORT'.
+    5. CASH RECYCLING: If cash is limited and no exit signals are present, choose 'HOLD'. 
+
+    Output in clean JSON structure exactly like this:
     {{
         "trades": [
             {{
-              "action": "BUY",
+              "action": "BUY" or "SELL" or "TRIM" or "HOLD",
               "ticker": "TICKER",
-              "strategy_bucket": "CORE",
-              "allocation_amount": 4000,
-              "analysis_display": "⚡ Core Allocation Sized via ATR Risk Scaling... [DETAILED MACRO/MOMENTUM THESIS]"
-            }},
-            {{
-              "action": "SELL",
-              "ticker": "TICKER",
-              "strategy_bucket": "HIGH_GROWTH",
-              "allocation_amount": "ALL",
-              "analysis_display": "🚨 Risk Threshold Breached... [RATIONALE]"
+              "strategy_bucket": "LONG_TERM_CORE" or "MACRO_SWING",
+              "allocation_amount": 5000,
+              "analysis_display": "Clear fundamental or technical explanation matching our trend rules."
             }}
         ]
     }}
     """
     
-    log_and_print(f"{YELLOW}[🧠 Gemini] Initiating Barbell Deep Thinking sequence via Google GenAI SDK...{RESET}")
-    
+    log_and_print(f"{YELLOW}[🧠 Gemini] Submitting data payload to GenAI Strategy Engine...{RESET}")
     try:
+        # UPDATED: Switched model to gemini-3.5-flash to utilize the free tier quota
         response = ai_client.models.generate_content(
-            model='gemini-2.5-flash',  # <--- Change this from 'gemini-2.5-pro'
+            model='gemini-3.5-flash',
             contents=system_prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json", 
-                temperature=1.0
-                # Note: Remove the 'thinking_config' line entirely if you switch to Flash, 
-                # as Flash does not use the high-reasoning parameter.
-            )
+            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.15)
         )
-        
-        raw_text = response.text.strip()
-        data = json.loads(raw_text)
-        
-        # Parse the object wrapper safely
-        if isinstance(data, dict) and "trades" in data:
-            return data["trades"]
-        elif isinstance(data, list):
-            return data
-        else:
-            log_and_print(f"{YELLOW}[⚠] Unexpected JSON structure from Gemini. Raw output: {raw_text}{RESET}")
-            return []
-            
+        data = json.loads(response.text.strip())
+        return consolidate_decisions(data.get("trades", data))
     except Exception as e:
-        log_and_print(f"{RED}[❌ System] Gemini API Error / Parsing Failure: {e}{RESET}")
+        log_and_print(f"{RED}[❌ System] GenAI Strategy query failed: {e}{RESET}")
         return []
 
-def execute_trades(agent_decisions, portfolio, buy_candidates, risk_matrix):
+def execute_trades(agent_decisions, portfolio, buy_candidates, risk_matrix, total_nav, is_correction):
     if not agent_decisions:
-        log_and_print(f"{YELLOW}[⚠] No actions returned by Gemini.{RESET}")
+        log_and_print(f"{YELLOW}[⚠] No strategic trades ordered today.{RESET}")
         return
+    
+    # 4% safe cash floor during normal markets, 0.5% during corrections
+    CASH_RESERVE_FLOOR = total_nav * 0.005 if is_correction else total_nav * 0.04
+    max_allocation = round(total_nav * 0.12, 2)
         
     for decision in agent_decisions:
         action = decision.get("action", "").upper()
         ticker = decision.get("ticker", "").upper()
-        amount = decision.get("allocation_amount", 0)
-        bucket = decision.get("strategy_bucket", "HIGH_GROWTH").upper()
-        rationale = decision.get("analysis_display", "No rationale provided.")
+        amount = float(decision.get("allocation_amount", 0))
+        bucket = decision.get("strategy_bucket", "MACRO_SWING").upper()
+        rationale = decision.get("analysis_display", "")
         
-        if action == "HOLD":
-            continue
+        if action == "HOLD": continue
             
-        elif action == "SELL" and ticker in portfolio["positions"]:
-            pos = portfolio["positions"][ticker]
-            current_price = risk_matrix.get(ticker, {}).get("current_price", pos["entry_price"])
-            shares = pos["shares"]
-            proceeds = shares * current_price
+        elif action in ["SELL", "TRIM"]:
+            target_key = f"{ticker}_{bucket}"
+            keys_to_process = [target_key] if target_key in portfolio["positions"] else [pk for pk in portfolio["positions"] if pk.startswith(ticker)]
             
-            portfolio["cash_balance"] += proceeds
-            del portfolio["positions"][ticker]
-            
-            msg = f"🔴 *GEMINI EXECUTION: FULL SELL {ticker} [{bucket}]*\n\nProceeds: ${round(proceeds, 2)}\nRationale: {rationale}"
-            log_and_print(f"{RED}{msg}{RESET}")
-            send_notification(msg)
-
-        elif action == "TRIM" and ticker in portfolio["positions"]:
-            pos = portfolio["positions"][ticker]
-            current_price = risk_matrix.get(ticker, {}).get("current_price", pos["entry_price"])
-            trim_amount = float(amount)
-            current_position_value = pos["shares"] * current_price
-            
-            if trim_amount >= current_position_value:
-                proceeds = pos["shares"] * current_price
-                portfolio["cash_balance"] += proceeds
-                del portfolio["positions"][ticker]
-                msg = f"✂️ *GEMINI EXECUTION: FULL LIQUIDATION VIA TRIM {ticker} [{bucket}]*\n\nProceeds: ${round(proceeds, 2)}\nRationale: {rationale}"
-            else:
-                shares_to_sell = trim_amount / current_price
-                portfolio["cash_balance"] += trim_amount
-                pos["shares"] -= shares_to_sell
-                pos["allocated_capital"] = pos["shares"] * pos["entry_price"]
-                msg = f"✂️ *GEMINI EXECUTION: TRIM {ticker} [{bucket}]*\n\nExtracted: ${round(trim_amount, 2)} | Remaining Value: ${round(pos['shares'] * current_price, 2)}\nRationale: {rationale}"
+            for pk in list(keys_to_process):
+                pos = portfolio["positions"][pk]
+                current_price = risk_matrix.get(pk, {}).get("current_price", pos["entry_price"])
                 
-            log_and_print(f"{YELLOW}{msg}{RESET}")
-            send_notification(msg)
+                if action == "SELL":
+                    portfolio["cash_balance"] += pos["shares"] * current_price
+                    del portfolio["positions"][pk]
+                    msg = f"🔴 *CORE STRUCTURAL EXIT: {ticker}*\n\nReason: {rationale}"
+                    log_and_print(f"{RED}{msg}{RESET}"); send_notification(msg)
+                elif action == "TRIM":
+                    trim_amount = min(amount, pos["shares"] * current_price)
+                    portfolio["cash_balance"] += trim_amount
+                    pos["shares"] -= (trim_amount / current_price)
+                    pos["allocated_capital"] = pos["shares"] * pos["entry_price"]
+                    msg = f"✂️ *TREND MITIGATION TRIM: {ticker}*\n\nReason: {rationale}"
+                    log_and_print(f"{YELLOW}{msg}{RESET}"); send_notification(msg)
             
         elif action == "BUY" and ticker in buy_candidates:
-            amount = float(amount)
-            if amount > portfolio["cash_balance"]:
-                amount = portfolio["cash_balance"]
-            
-            if amount <= 0:
-                continue
+            if (portfolio["cash_balance"] - amount) < CASH_RESERVE_FLOOR:
+                amount = max(0.0, portfolio["cash_balance"] - CASH_RESERVE_FLOOR)
+                
+            current_exposure = sum(p["allocated_capital"] for pk, p in portfolio["positions"].items() if pk.startswith(ticker))
+            if current_exposure + amount > max_allocation:
+                amount = max(0.0, max_allocation - current_exposure)
+                
+            if amount <= 500: continue
                 
             current_price = buy_candidates[ticker]["price"]
             shares = amount / current_price
-            
             portfolio["cash_balance"] -= amount
-            if ticker in portfolio["positions"]:
-                old_shares = portfolio["positions"][ticker]["shares"]
-                old_capital = portfolio["positions"][ticker]["allocated_capital"]
-                new_total_shares = old_shares + shares
-                new_total_capital = old_capital + amount
-                
-                portfolio["positions"][ticker]["shares"] = new_total_shares
-                portfolio["positions"][ticker]["allocated_capital"] = new_total_capital
-                portfolio["positions"][ticker]["entry_price"] = new_total_capital / new_total_shares
-                portfolio["positions"][ticker]["strategy_bucket"] = bucket
+            pos_key = f"{ticker}_{bucket}"
+            
+            if pos_key in portfolio["positions"]:
+                old_shares = portfolio["positions"][pos_key]["shares"]
+                old_capital = portfolio["positions"][pos_key]["allocated_capital"]
+                portfolio["positions"][pos_key]["shares"] = old_shares + shares
+                portfolio["positions"][pos_key]["allocated_capital"] = old_capital + amount
+                portfolio["positions"][pos_key]["entry_price"] = (old_capital + amount) / (old_shares + shares)
             else:
-                portfolio["positions"][ticker] = {
+                portfolio["positions"][pos_key] = {
                     "entry_price": current_price,
                     "shares": shares,
                     "allocated_capital": amount,
-                    "highest_price_seen": current_price,
                     "strategy_bucket": bucket,
-                    "purchase_date": datetime.now(ZoneInfo("America/New_York")).strftime('%Y-%m-%d')
+                    "purchase_date": datetime.now(ZoneInfo("America/New_York")).strftime('%Y-%m-%d'),
+                    "buying_thesis": rationale
                 }
                 
-            msg = f"🟢 *GEMINI EXECUTION: BUY {ticker} [{bucket}]*\n\nAllocated: ${round(amount, 2)}\nShares: {round(shares, 4)} @ ${current_price}\nRationale: {rationale}"
-            log_and_print(f"{GREEN}{msg}{RESET}")
-            send_notification(msg)
+            msg = f"🟢 *STRATEGIC ACQUISITION: {ticker}*\n\nSetup: {buy_candidates[ticker]['setup_type']}\nAllocated: ${round(amount, 2)} @ ${current_price}\nThesis: {rationale}"
+            log_and_print(f"{GREEN}{msg}{RESET}"); send_notification(msg)
 
     save_portfolio(portfolio)
-    log_and_print(f"{CYAN}[✓] Barbell Portfolio balanced and committed to disk. Current Cash: ${round(portfolio['cash_balance'], 2)}{RESET}")
 
 # ==========================================
-# 6. CLOUD & LOCAL EXECUTION MANAGER (UTC SYNCHRONIZED)
+# 6. MAIN EXECUTION LOOP
 # ==========================================
 if __name__ == "__main__":
-    # --- CLOUD MODE (GitHub Actions Standalone Integration) ---
-    if "--single-run" in sys.argv:
-        log_and_print(f"{CYAN}[⚙️ Cloud] Triggering standalone strategic matrix execution...{RESET}")
-        send_notification("🤖 *Gemini Autopilot:* Initializing cloud execution cycle...")
-        
-        portfolio = load_portfolio()
-        universe = get_dynamic_universe()
-        buy_setups = run_two_stage_screener(universe)
-        risk_matrix = evaluate_open_positions(portfolio)
-        
-        decisions = query_gemini_brain(buy_setups, portfolio, risk_matrix)
-        execute_trades(decisions, portfolio, buy_setups, risk_matrix)
-        
-        log_and_print(f"{GREEN}[✓] Cloud matrix cycle complete. Shutting down server.{RESET}")
-        sys.exit(0)
-        
-    # --- LOCAL MODE (Your Background Machine Daemon) ---
-    log_and_print(f"{CYAN}===================================================={RESET}")
-    log_and_print(f"{CYAN}  GEMINI BARBELL MODEL DAEMON STATUS: OPERATIONAL   {RESET}")
-    log_and_print(f"{CYAN}===================================================={RESET}")
+    log_and_print(f"{CYAN}=================================================={RESET}")
+    log_and_print(f"{CYAN}   🚀 INITIALIZING INSTITUTIONAL GROWTH ENGINE    {RESET}")
+    log_and_print(f"{CYAN}=================================================={RESET}")
     
-    SCHEDULE = [
-        {"hour": 13, "minute": 0, "name": "PRE-MARKET"},    # 13:00 UTC = 9:00 AM New York / 10:30 PM Darwin
-        {"hour": 20, "minute": 15, "name": "AFTER-CLOSE"}   # 20:15 UTC = 4:15 PM New York / 5:45 AM Darwin
-    ]
+    portfolio = load_portfolio()
+    universe = get_macro_universe()
     
-    last_run_signature = ""
-
-    while True:
-        try:
-            now_utc = datetime.now(ZoneInfo("UTC"))
-            current_date_str = now_utc.strftime('%Y-%m-%d')
-            
-            if now_utc.weekday() < 5: 
-                for session in SCHEDULE:
-                    if now_utc.hour == session["hour"] and now_utc.minute == session["minute"]:
-                        
-                        current_signature = f"{current_date_str}-{session['name']}"
-                        
-                        if last_run_signature != current_signature:
-                            log_and_print(f"{CYAN}[🤖 Autopilot] UTC Target {session['name']} Hit! Initiating Matrix...{RESET}")
-                            send_notification(f"🤖 *Gemini Autopilot:* Launching {session['name']} matrix scan...")
-                            
-                            portfolio = load_portfolio()
-                            universe = get_dynamic_universe()
-                            buy_setups = run_two_stage_screener(universe)
-                            risk_matrix = evaluate_open_positions(portfolio)
-                            
-                            decisions = query_gemini_brain(buy_setups, portfolio, risk_matrix)
-                            execute_trades(decisions, portfolio, buy_setups, risk_matrix)
-                            
-                            last_run_signature = current_signature
-                            log_and_print(f"{GREEN}[✓] {session['name']} cycle complete. Returning to background sleep.{RESET}")
-            
-            time.sleep(30)
-            
-        except Exception as e:
-            log_and_print(f"{RED}[❌ Daemon Error] {e}{RESET}")
-            time.sleep(60)
+    # 1. Market Health Check
+    is_correction, current_drawdown = check_market_regime()
+    
+    # 2. Quality Screener (GARP + 200W EMA)
+    buy_setups = run_macro_screener(universe)
+    
+    # 3. Live Risk Monitor (Uncapped + Weekly MACD Divergences)
+    risk_matrix, current_nav = evaluate_open_positions(portfolio)
+    
+    # 4. AI Strategy Decision Engine
+    decisions = query_gemini_brain(buy_setups, portfolio, risk_matrix, current_nav, is_correction)
+    
+    # 5. Broker Execution
+    execute_trades(decisions, portfolio, buy_setups, risk_matrix, current_nav, is_correction)
+    
+    log_and_print(f"{CYAN}=================================================={RESET}")
+    log_and_print(f"{CYAN}         ✅ SYSTEM OPERATION COMPLETED            {RESET}")
+    log_and_print(f"{CYAN}=================================================={RESET}")
