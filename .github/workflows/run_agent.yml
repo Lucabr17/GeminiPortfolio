@@ -42,3 +42,10 @@ jobs:
         git config --global user.email "actions@github.com"
         git add portfolio.json agent.log
         git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 [Autopilot] Portfolio state ledger updated via cloud execution" && git push)
+        - name: Commit and push updated portfolio
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "action@github.com"
+          git add portfolio.json agent.log
+          git commit -m "🤖 Auto-update portfolio and logs" || echo "No changes to commit"
+          git push
