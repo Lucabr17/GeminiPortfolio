@@ -2,8 +2,6 @@ name: Run Gemini AI Fund Manager
 
 on:
   schedule:
-    # 13:00 UTC (Pre-Market Scan) -> Monday to Friday
-    - cron: '0 13 * * 1-5'
     # 20:15 UTC (After-Close Scan) -> Monday to Friday
     - cron: '15 20 * * 1-5'
   workflow_dispatch: # Allows you to manually trigger it via a button
