@@ -306,8 +306,13 @@ def consolidate_decisions(decisions):
     return list(consolidated.values())
 
 def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_correction):
+    """
+    Core AI Decision Engine. Synthesizes macro conditions, portfolio state, and micro-fundamentals.
+    Returns a list of trade dictionaries to be executed.
+    """
+    
     system_prompt = f"""
-    You are an aggressive Institutional Quality Growth portfolio manager. Your operational mandate is to ride high-conviction structural trends and let winning positions compound without artificial size limitations.
+    You are an elite Institutional Portfolio Manager for a high-conviction Growth & Hard Asset portfolio. Your mandate is to analyze market macro conditions AND micro-fundamentals to drive conviction-based trading.
 
     PORTFOLIO OPERATIONAL STATUS:
     * Current Estimated Portfolio NAV: ${round(total_nav, 2)}
@@ -316,15 +321,23 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_cor
     
     Active Positions Risk Registry: {json.dumps(risk_matrix)}
     Top Quant-Filtered Growth Opportunities: {json.dumps(buy_candidates)}
-    
-    SYSTEM TRADING PROTOCOLS:
-    1. RUN THE WINNERS: Ignore how large an asset's 'current_weight_pct' is. You are forbidden from trimming an asset simply because it is large or up significantly. Let it run completely unchecked.
-    2. TECHNICAL/FUNDAMENTAL EXITS: You should only order a 'SELL' or 'TRIM' if an asset's 'algo_risk_status' explicitly notes a 'CRITICAL WEEKLY BREAKDOWN', 'FUNDAMENTAL REVERSAL', or requests a 'Potential Trim'. 
-    3. RESPECT DIVERGENCES: If a status reads 'DEEP DRAWDOWN WITH BULLISH DIVERGENCE', you MUST output 'HOLD'.
-    4. CAPITAL DEPLOYMENT: Standard initial position allocation is ~10% of total NAV. Prioritize companies highlighted with the tag 'GENERATIONAL 200-WEEK EMA SUPPORT'.
-    5. CASH RECYCLING: If cash is limited and no exit signals are present, choose 'HOLD'. 
 
-    Output in clean JSON structure exactly like this:
+    INSTITUTIONAL DIRECTIVES & TRADING PROTOCOLS:
+    1. MACRO-FIRST APPROACH: Do not buy a stock in a vacuum. Evaluate current macroeconomic tailwinds (e.g., AI power demand, inflation hedges, interest rate environment, dollar strength) before allocating capital.
+    2. AVOID VALUE TRAPS: A low Forward PE is often a red flag, not a buy signal. You must confirm strong revenue growth, high ROE, or a structural industry tailwind before buying a "cheap" stock.
+    3. RUN THE WINNERS: Ignore how large an asset's 'current_weight_pct' is. Let winning positions compound unchecked unless there is a fundamental breakdown.
+    4. CAPITAL DEPLOYMENT: Standard initial position allocation is ~10% of total NAV. Prioritize companies with undeniable structural tailwinds over speculative, rate-sensitive growth.
+
+    INSTRUCTIONS:
+    First, write a deep-dive "MARKET COMMENTARY" detailing your macro synthesis, why you are avoiding certain sectors, and why you have conviction in the themes you are buying today.
+    Second, output the actual trades in a strict JSON array under the heading "JSON_DATA:".
+
+    Output your response EXACTLY in this format:
+
+    MARKET COMMENTARY:
+    [Your 2-3 paragraph deep-dive analysis of macro conditions, sector rotation, and specific thesis for today's rebalance. Explain your reasoning thoroughly.]
+    
+    JSON_DATA:
     {{
         "trades": [
             {{
@@ -332,26 +345,54 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_cor
               "ticker": "TICKER",
               "strategy_bucket": "LONG_TERM_CORE" or "MACRO_SWING",
               "allocation_amount": 5000,
-              "analysis_display": "Clear fundamental or technical explanation matching our trend rules."
+              "analysis_display": "Concise summary of the specific technical/fundamental trigger."
             }}
         ]
     }}
     """
     
-    log_and_print(f"{YELLOW}[🧠 Gemini] Submitting data payload to GenAI Strategy Engine...{RESET}")
+    log_and_print(f"{YELLOW}[🧠 Gemini] Submitting macro data payload to GenAI Strategy Engine...{RESET}")
     
     try:
         response = ai_client.models.generate_content(
             model='gemini-3.1-pro-preview',
             contents=system_prompt,
             config=types.GenerateContentConfig(
-                response_mime_type="application/json", 
                 temperature=0.15,
                 thinking_config=types.ThinkingConfig(thinking_level="high")
             )
         )
-        data = json.loads(response.text.strip())
-        return consolidate_decisions(data.get("trades", data))
+        
+        raw_text = response.text.strip()
+        
+        # 1. Parse out the Macro Commentary
+        commentary = ""
+        if "JSON_DATA:" in raw_text:
+            parts = raw_text.split("JSON_DATA:")
+            commentary = parts[0].replace("MARKET COMMENTARY:", "").strip()
+            json_str = parts[1].strip()
+        else:
+            # Fallback in case the model forgets the separator
+            json_str = raw_text
+        
+        # 2. Clean the JSON string (remove markdown code blocks if the model adds them)
+        if json_str.startswith("```json"):
+            json_str = json_str.replace("```json\n", "").replace("```", "").strip()
+        elif json_str.startswith("```"):
+            json_str = json_str.replace("```\n", "").replace("```", "").strip()
+            
+        # 3. Parse the JSON
+        data = json.loads(json_str)
+        trades = data.get("trades", data)
+        
+        # 4. Push the deep-dive commentary to Telegram
+        if commentary:
+            log_and_print(f"{GREEN}[🧠 Gemini] Macro analysis generated successfully.{RESET}")
+            # Ensure you have your send_notification function defined elsewhere in autopilot.py
+            send_notification(f"📊 *Institutional Macro Report:*\n\n{commentary}")
+        
+        return consolidate_decisions(trades)
+        
     except Exception as e:
         log_and_print(f"{RED}[❌ System] GenAI Strategy query failed: {e}{RESET}")
         return []
