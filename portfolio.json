@@ -1,4 +1,45 @@
 {
-    "cash_balance": 100000.0,
-    "positions": {}
+    "cash_balance": 50000.0,
+    "positions": {
+        "LLY_LONG_TERM_CORE": {
+            "entry_price": 1131.42,
+            "shares": 8.838450796344416,
+            "allocated_capital": 10000.0,
+            "strategy_bucket": "LONG_TERM_CORE",
+            "purchase_date": "2026-06-07",
+            "buying_thesis": "Generational GLP-1 structural tailwind driving an exceptional 107% ROE and 55% revenue growth."
+        },
+        "MU_MACRO_SWING": {
+            "entry_price": 864.01,
+            "shares": 11.573940116433837,
+            "allocated_capital": 10000.0,
+            "strategy_bucket": "MACRO_SWING",
+            "purchase_date": "2026-06-07",
+            "buying_thesis": "HBM memory supercycle confirmed by 196% rev growth; low PE is a cyclical breakout opportunity, not a value trap."
+        },
+        "AVGO_LONG_TERM_CORE": {
+            "entry_price": 385.73,
+            "shares": 25.924869727529618,
+            "allocated_capital": 10000.0,
+            "strategy_bucket": "LONG_TERM_CORE",
+            "purchase_date": "2026-06-07",
+            "buying_thesis": "AI networking and custom ASIC dominance with 47% rev growth and strong 37% ROE."
+        },
+        "VST_MACRO_SWING": {
+            "entry_price": 148.76,
+            "shares": 67.22237160527024,
+            "allocated_capital": 10000.0,
+            "strategy_bucket": "MACRO_SWING",
+            "purchase_date": "2026-06-07",
+            "buying_thesis": "Direct macro play on AI data center power demand; excellent 43% rev growth and cheap valuation."
+        },
+        "MSFT_LONG_TERM_CORE": {
+            "entry_price": 416.67,
+            "shares": 23.999808001535985,
+            "allocated_capital": 10000.0,
+            "strategy_bucket": "LONG_TERM_CORE",
+            "purchase_date": "2026-06-07",
+            "buying_thesis": "Foundational AI cloud infrastructure providing portfolio stability with a highly consistent 34% ROE."
+        }
+    }
 }
