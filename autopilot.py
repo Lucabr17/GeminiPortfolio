@@ -340,9 +340,9 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_cor
     
     log_and_print(f"{YELLOW}[🧠 Gemini] Submitting data payload to GenAI Strategy Engine...{RESET}")
     try:
-        # UPDATED: Switched model to gemini-3.5-flash to utilize the free tier quota
+        # UPDATED: Switched model identifier to gemini-3.1-pro
         response = ai_client.models.generate_content(
-            model='gemini-3.5-flash',
+            model='gemini-3.1-pro',
             contents=system_prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.15)
         )
