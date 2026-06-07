@@ -297,3 +297,22 @@ Shares: 32.9831 @ $152.4
 Rationale: ⚡ High Growth Allocation Sized to balance bucket allocation leveraging strong structural dip-buying signals (RSI exhaustion, near 90d floor, deep breakdown) while managing bad volatility.
 2026-06-05 21:47:08,514 | [✓] Barbell Portfolio balanced and committed to disk. Current Cash: $4450.34
 2026-06-05 21:47:08,514 | [✓] Cloud matrix cycle complete. Shutting down server.
+2026-06-07 03:20:48,772 | INFO | ==================================================
+2026-06-07 03:20:48,772 | INFO |    🚀 INITIALIZING INSTITUTIONAL GROWTH ENGINE    
+2026-06-07 03:20:48,772 | INFO | ==================================================
+2026-06-07 03:20:48,772 | INFO | [🌐 Universe] Compiling macro universe...
+2026-06-07 03:20:48,880 | INFO | Warning: Failed to fetch S&P 500. HTTP Error 403: Forbidden
+2026-06-07 03:20:48,967 | INFO | Warning: Failed to fetch Nasdaq 100. HTTP Error 403: Forbidden
+2026-06-07 03:20:48,968 | INFO | [🌐 Universe] Total tracked equities: 17
+2026-06-07 03:20:48,968 | INFO | [🔍 Regime] Assessing broader market drawdown levels...
+2026-06-07 03:20:49,640 | INFO | [🔍 Regime] S&P 500 Drawdown: 3.11% | Correction Mode: False
+2026-06-07 03:20:49,640 | INFO | [⚙️ Matrix] Running institutional quality and 200-Week EMA screener...
+2026-06-07 03:20:55,810 | INFO | [📊 Audit] Evaluating structural trend and MACD momentum for portfolio holdings...
+2026-06-07 03:20:55,810 | INFO | [🧠 Gemini] Submitting data payload to GenAI Strategy Engine...
+2026-06-07 03:20:55,810 | INFO | AFC is enabled with max remote calls: 10.
+2026-06-07 03:20:55,930 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro:generateContent "HTTP/1.1 404 Not Found"
+2026-06-07 03:20:55,930 | INFO | [❌ System] GenAI Strategy query failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3.1-pro is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}
+2026-06-07 03:20:55,930 | INFO | [⚠] No strategic trades ordered today.
+2026-06-07 03:20:55,930 | INFO | ==================================================
+2026-06-07 03:20:55,930 | INFO |          ✅ SYSTEM OPERATION COMPLETED            
+2026-06-07 03:20:55,930 | INFO | ==================================================
