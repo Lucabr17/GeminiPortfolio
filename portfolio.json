@@ -1,4 +1,45 @@
 {
-    "cash_balance": 100000.0,
-    "positions": {}
+    "cash_balance": 50000.0,
+    "positions": {
+        "AVGO_LONG_TERM_CORE": {
+            "entry_price": 385.73,
+            "shares": 25.924869727529618,
+            "allocated_capital": 10000.0,
+            "strategy_bucket": "LONG_TERM_CORE",
+            "purchase_date": "2026-06-06",
+            "buying_thesis": "Initiating standard 10% core position. AVGO shows strong fundamental momentum with 47.9% revenue growth and 37.28% ROE at a reasonable forward PE of 19.96."
+        },
+        "MU_LONG_TERM_CORE": {
+            "entry_price": 864.01,
+            "shares": 11.573940116433837,
+            "allocated_capital": 10000.0,
+            "strategy_bucket": "LONG_TERM_CORE",
+            "purchase_date": "2026-06-06",
+            "buying_thesis": "Initiating standard 10% core position. MU exhibits exceptional revenue growth of 196.3% and a highly attractive forward PE of 8.15, fitting our aggressive growth mandate."
+        },
+        "LLY_LONG_TERM_CORE": {
+            "entry_price": 1131.42,
+            "shares": 8.838450796344416,
+            "allocated_capital": 10000.0,
+            "strategy_bucket": "LONG_TERM_CORE",
+            "purchase_date": "2026-06-06",
+            "buying_thesis": "Initiating standard 10% core position. LLY boasts an outstanding ROE of 107.46% and 55.5% revenue growth, indicating a high-conviction structural trend."
+        },
+        "VST_LONG_TERM_CORE": {
+            "entry_price": 148.76,
+            "shares": 67.22237160527024,
+            "allocated_capital": 10000.0,
+            "strategy_bucket": "LONG_TERM_CORE",
+            "purchase_date": "2026-06-06",
+            "buying_thesis": "Initiating standard 10% core position. VST presents a solid setup with 43.4% revenue growth and 42.9% ROE, supported by a low forward PE of 13.58."
+        },
+        "MSFT_LONG_TERM_CORE": {
+            "entry_price": 416.67,
+            "shares": 23.999808001535985,
+            "allocated_capital": 10000.0,
+            "strategy_bucket": "LONG_TERM_CORE",
+            "purchase_date": "2026-06-06",
+            "buying_thesis": "Initiating standard 10% core position. MSFT provides consistent, high-quality growth with 34.01% ROE and 18.3% revenue growth, serving as a stable compounder."
+        }
+    }
 }
