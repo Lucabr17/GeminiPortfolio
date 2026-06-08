@@ -307,12 +307,13 @@ def consolidate_decisions(decisions):
 
 def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_correction):
     """
-    Core AI Decision Engine. Synthesizes macro conditions, portfolio state, and micro-fundamentals.
-    Returns a list of trade dictionaries to be executed.
+    Advanced Institutional AI Engine. 
+    Synthesizes Macro Regimes, Micro-Fundamentals, Price Action Drawdowns, 
+    and Historical/Sector Valuation Baselines to eliminate value traps and catch de-risked growth.
     """
     
     system_prompt = f"""
-    You are an elite Institutional Portfolio Manager for a high-conviction Growth & Hard Asset portfolio. Your mandate is to analyze market macro conditions AND micro-fundamentals to drive conviction-based trading.
+    You are an elite Institutional Portfolio Manager executing a Top-Down Macro, Bottom-Up Fundamental, and Advanced Technical Framework. 
 
     PORTFOLIO OPERATIONAL STATUS:
     * Current Estimated Portfolio NAV: ${round(total_nav, 2)}
@@ -320,22 +321,33 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_cor
     * BROADER MARKET CORRECTION ACTIVE: {is_correction}
     
     Active Positions Risk Registry: {json.dumps(risk_matrix)}
-    Top Quant-Filtered Growth Opportunities: {json.dumps(buy_candidates)}
+    Top Quant-Filtered Growth Opportunities (Raw Data): {json.dumps(buy_candidates)}
 
     INSTITUTIONAL DIRECTIVES & TRADING PROTOCOLS:
-    1. MACRO-FIRST APPROACH: Do not buy a stock in a vacuum. Evaluate current macroeconomic tailwinds (e.g., AI power demand, inflation hedges, interest rate environment, dollar strength) before allocating capital.
-    2. AVOID VALUE TRAPS: A low Forward PE is often a red flag, not a buy signal. You must confirm strong revenue growth, high ROE, or a structural industry tailwind before buying a "cheap" stock.
-    3. RUN THE WINNERS: Ignore how large an asset's 'current_weight_pct' is. Let winning positions compound unchecked unless there is a fundamental breakdown.
-    4. CAPITAL DEPLOYMENT: Standard initial position allocation is ~10% of total NAV. Prioritize companies with undeniable structural tailwinds over speculative, rate-sensitive growth.
+
+    1. PRICE ACTION & DRAWDOWN EVALUATION (CONTEXTUAL DE-RISKING):
+       Do not evaluate valuation in a vacuum. You must cross-reference a stock's current price action with its drawdown from its All-Time High (ATH) or 52-week high. If a structural compounder (e.g., NOW, META, AMD) has undergone a severe price washout (-30% to -60%) but forward growth remains intact, classify the multiple as "de-risked." Treat severe technical drawdowns in secular trends as high-conviction asymmetric buy opportunities where the macro risk is already priced in.
+
+    2. HISTORICAL & SECTOR MULTIPLE COMPRESSION ANALYSIS:
+       Analyze whether a company’s valuation metric (Forward P/E, EV/Sales, Price/Book) is cheap or expensive relative to:
+       * Its own 5-year historical trading range and median baseline.
+       * Its specific industry sector peers.
+       Recognize that absolute numbers are deceptive. A 40x Forward P/E on a software monopoly may be historically cheap if its 5-year median is 55x. Conversely, a 12x Forward P/E on an industrial or legacy enterprise firm may be a value trap if its sector median is 9x.
+
+    3. ANTI-VALUE TRAP PROTOCOL:
+       Reject companies with cheap absolute multiples if their revenue growth is decelerating to single digits, gross margins are compressing, or they lack a structural macro tailwind. Every buy order must possess a clear catalyst (e.g., AI hardware/power infrastructure buildout, structural hard asset inflation hedge, defense spending cycles).
+
+    4. CAPITAL ALLOCATION STRATEGY:
+       Standard position size is ~10% of total NAV. Let winners compound unchecked unless technical metrics show a complete structural breakdown.
 
     INSTRUCTIONS:
-    First, write a deep-dive "MARKET COMMENTARY" detailing your macro synthesis, why you are avoiding certain sectors, and why you have conviction in the themes you are buying today.
-    Second, output the actual trades in a strict JSON array under the heading "JSON_DATA:".
+    First, write a deep-dive "MARKET COMMENTARY" detailing your macro synthesis, explaining how price drawdowns have de-risked specific high-quality assets, and highlighting structural sector tailwinds.
+    Second, output the execution array in a strict JSON structure under the heading "JSON_DATA:".
 
     Output your response EXACTLY in this format:
 
     MARKET COMMENTARY:
-    [Your 2-3 paragraph deep-dive analysis of macro conditions, sector rotation, and specific thesis for today's rebalance. Explain your reasoning thoroughly.]
+    [Your 2-3 paragraph institutional analysis. Explicitly reference how price action/drawdowns and historical valuation baselines influenced your trade choices today.]
     
     JSON_DATA:
     {{
@@ -345,13 +357,13 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_cor
               "ticker": "TICKER",
               "strategy_bucket": "LONG_TERM_CORE" or "MACRO_SWING",
               "allocation_amount": 5000,
-              "analysis_display": "Concise summary of the specific technical/fundamental trigger."
+              "analysis_display": "Technical/Fundamental rationale detailing historical multiple compression and drawdown state."
             }}
         ]
     }}
     """
     
-    log_and_print(f"{YELLOW}[🧠 Gemini] Submitting macro data payload to GenAI Strategy Engine...{RESET}")
+    log_and_print(f"{YELLOW}[🧠 Gemini] Submitting data to Macro & Technical Synthesis Engine...{RESET}")
     
     try:
         response = ai_client.models.generate_content(
@@ -365,31 +377,29 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_cor
         
         raw_text = response.text.strip()
         
-        # 1. Parse out the Macro Commentary
+        # 1. Parse out the Macro and Price Action Commentary
         commentary = ""
         if "JSON_DATA:" in raw_text:
             parts = raw_text.split("JSON_DATA:")
             commentary = parts[0].replace("MARKET COMMENTARY:", "").strip()
             json_str = parts[1].strip()
         else:
-            # Fallback in case the model forgets the separator
             json_str = raw_text
         
-        # 2. Clean the JSON string (remove markdown code blocks if the model adds them)
+        # 2. Clean markdown blocks if the model wrapped the JSON output
         if json_str.startswith("```json"):
             json_str = json_str.replace("```json\n", "").replace("```", "").strip()
         elif json_str.startswith("```"):
             json_str = json_str.replace("```\n", "").replace("```", "").strip()
             
-        # 3. Parse the JSON
+        # 3. Parse JSON execution block
         data = json.loads(json_str)
         trades = data.get("trades", data)
         
-        # 4. Push the deep-dive commentary to Telegram
+        # 4. Route full narrative intelligence report to Telegram
         if commentary:
-            log_and_print(f"{GREEN}[🧠 Gemini] Macro analysis generated successfully.{RESET}")
-            # Ensure you have your send_notification function defined elsewhere in autopilot.py
-            send_notification(f"📊 *Institutional Macro Report:*\n\n{commentary}")
+            log_and_print(f"{GREEN}[🧠 Gemini] Price action and historical valuation scan complete.{RESET}")
+            send_notification(f"📊 *Institutional Macro & Technical Report:*\n\n{commentary}")
         
         return consolidate_decisions(trades)
         
