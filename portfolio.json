@@ -1,5 +1,5 @@
 {
-    "cash_balance": 50000.0,
+    "cash_balance": 48136.5,
     "positions": {
         "LLY_LONG_TERM_CORE": {
             "entry_price": 1131.42,
@@ -34,9 +34,9 @@
             "buying_thesis": "Direct macro play on AI data center power demand; excellent 43% rev growth and cheap valuation."
         },
         "MSFT_LONG_TERM_CORE": {
-            "entry_price": 416.67,
-            "shares": 23.999808001535985,
-            "allocated_capital": 10000.0,
+            "entry_price": 413.51351018351266,
+            "shares": 28.689510034956562,
+            "allocated_capital": 11863.5,
             "strategy_bucket": "LONG_TERM_CORE",
             "purchase_date": "2026-06-07",
             "buying_thesis": "Foundational AI cloud infrastructure providing portfolio stability with a highly consistent 34% ROE."
