@@ -1,5 +1,5 @@
 {
-    "cash_balance": 48136.5,
+    "cash_balance": 50636.5,
     "positions": {
         "LLY_LONG_TERM_CORE": {
             "entry_price": 1131.42,
@@ -27,8 +27,8 @@
         },
         "VST_MACRO_SWING": {
             "entry_price": 148.76,
-            "shares": 67.22237160527024,
-            "allocated_capital": 10000.0,
+            "shares": 50.41677870395268,
+            "allocated_capital": 7500.0,
             "strategy_bucket": "MACRO_SWING",
             "purchase_date": "2026-06-07",
             "buying_thesis": "Direct macro play on AI data center power demand; excellent 43% rev growth and cheap valuation."
