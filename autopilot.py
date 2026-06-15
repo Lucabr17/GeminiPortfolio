@@ -308,12 +308,11 @@ def consolidate_decisions(decisions):
 def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_correction):
     """
     Advanced Institutional AI Engine. 
-    Synthesizes Macro Regimes, Micro-Fundamentals, Price Action Drawdowns, 
-    and Historical/Sector Valuation Baselines to eliminate value traps and catch de-risked growth.
+    Outputs explicit transaction sizing parameters for BUYS, SELLS, and TRIMS.
     """
     
     system_prompt = f"""
-    You are an elite Institutional Portfolio Manager executing a Top-Down Macro, Bottom-Up Fundamental, and Advanced Technical Framework. 
+    You are an elite Institutional Portfolio Manager executing a Top-Down Macro framework. 
 
     PORTFOLIO OPERATIONAL STATUS:
     * Current Estimated Portfolio NAV: ${round(total_nav, 2)}
@@ -324,30 +323,21 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_cor
     Top Quant-Filtered Growth Opportunities (Raw Data): {json.dumps(buy_candidates)}
 
     INSTITUTIONAL DIRECTIVES & TRADING PROTOCOLS:
-
-    1. PRICE ACTION & DRAWDOWN EVALUATION (CONTEXTUAL DE-RISKING):
-       Do not evaluate valuation in a vacuum. You must cross-reference a stock's current price action with its drawdown from its All-Time High (ATH) or 52-week high. If a structural compounder (e.g., NOW, META, AMD) has undergone a severe price washout (-30% to -60%) but forward growth remains intact, classify the multiple as "de-risked." Treat severe technical drawdowns in secular trends as high-conviction asymmetric buy opportunities where the macro risk is already priced in.
-
-    2. HISTORICAL & SECTOR MULTIPLE COMPRESSION ANALYSIS:
-       Analyze whether a company’s valuation metric (Forward P/E, EV/Sales, Price/Book) is cheap or expensive relative to:
-       * Its own 5-year historical trading range and median baseline.
-       * Its specific industry sector peers.
-       Recognize that absolute numbers are deceptive. A 40x Forward P/E on a software monopoly may be historically cheap if its 5-year median is 55x. Conversely, a 12x Forward P/E on an industrial or legacy enterprise firm may be a value trap if its sector median is 9x.
-
-    3. ANTI-VALUE TRAP PROTOCOL:
-       Reject companies with cheap absolute multiples if their revenue growth is decelerating to single digits, gross margins are compressing, or they lack a structural macro tailwind. Every buy order must possess a clear catalyst (e.g., AI hardware/power infrastructure buildout, structural hard asset inflation hedge, defense spending cycles).
-
-    4. CAPITAL ALLOCATION STRATEGY:
-       Standard position size is ~10% of total NAV. Let winners compound unchecked unless technical metrics show a complete structural breakdown.
+    1. PRICE ACTION & DRAWDOWN EVALUATION: Treat severe technical drawdowns in secular trends as high-conviction asymmetric buy opportunities where macro risk is already priced in.
+    2. HISTORICAL MULTIPLE COMPRESSION: Cross-reference absolute metrics with 5-year historical medians to avoid value traps.
+    3. EXACT TRANSACTION SIZING: 
+       * For a BUY: Allocate an explicit dollar amount (typically ~10% of total NAV).
+       * For a TRIM: Specify the exact dollar amount to liquidate AND the percentage of the current position being cut (e.g., trim 25% or 50% of the holding).
+       * For a SELL: Liquidation value must equal 100% of the current asset value.
 
     INSTRUCTIONS:
-    First, write a deep-dive "MARKET COMMENTARY" detailing your macro synthesis, explaining how price drawdowns have de-risked specific high-quality assets, and highlighting structural sector tailwinds.
+    First, write a deep-dive "MARKET COMMENTARY" detailing your macro synthesis.
     Second, output the execution array in a strict JSON structure under the heading "JSON_DATA:".
 
     Output your response EXACTLY in this format:
 
     MARKET COMMENTARY:
-    [Your 2-3 paragraph institutional analysis. Explicitly reference how price action/drawdowns and historical valuation baselines influenced your trade choices today.]
+    [Your institutional macro and price action analysis paragraph.]
     
     JSON_DATA:
     {{
@@ -356,14 +346,15 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_cor
               "action": "BUY" or "SELL" or "TRIM" or "HOLD",
               "ticker": "TICKER",
               "strategy_bucket": "LONG_TERM_CORE" or "MACRO_SWING",
-              "allocation_amount": 5000,
+              "transaction_value_usd": 5000, 
+              "position_action_percentage": 50,
               "analysis_display": "Technical/Fundamental rationale detailing historical multiple compression and drawdown state."
             }}
         ]
     }}
     """
     
-    log_and_print(f"{YELLOW}[🧠 Gemini] Submitting data to Macro & Technical Synthesis Engine...{RESET}")
+    log_and_print(f"{YELLOW}[🧠 Gemini] Submitting data to Macro & Sizing Engine...{RESET}")
     
     try:
         response = ai_client.models.generate_content(
@@ -377,7 +368,6 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_cor
         
         raw_text = response.text.strip()
         
-        # 1. Parse out the Macro and Price Action Commentary
         commentary = ""
         if "JSON_DATA:" in raw_text:
             parts = raw_text.split("JSON_DATA:")
@@ -386,19 +376,18 @@ def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_cor
         else:
             json_str = raw_text
         
-        # 2. Clean markdown blocks if the model wrapped the JSON output
         if json_str.startswith("```json"):
-            json_str = json_str.replace("```json\n", "").replace("```", "").strip()
+            json_str = json_str.replace("
+```json\n", "").replace("```", "").strip()
         elif json_str.startswith("```"):
-            json_str = json_str.replace("```\n", "").replace("```", "").strip()
+            json_str = json_str.replace("
+```\n", "").replace("```", "").strip()
             
-        # 3. Parse JSON execution block
         data = json.loads(json_str)
         trades = data.get("trades", data)
         
-        # 4. Route full narrative intelligence report to Telegram
         if commentary:
-            log_and_print(f"{GREEN}[🧠 Gemini] Price action and historical valuation scan complete.{RESET}")
+            log_and_print(f"{GREEN}[🧠 Gemini] Price action scan complete.{RESET}")
             send_notification(f"📊 *Institutional Macro & Technical Report:*\n\n{commentary}")
         
         return consolidate_decisions(trades)
