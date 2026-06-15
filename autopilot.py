@@ -408,7 +408,9 @@ def execute_trades(agent_decisions, portfolio, buy_candidates, risk_matrix, tota
     for decision in agent_decisions:
         action = decision.get("action", "").upper()
         ticker = decision.get("ticker", "").upper()
-        amount = float(decision.get("allocation_amount", 0))
+        # Extract new strict sizing metrics from the AI (fallback to old allocation_amount if needed)
+        value = float(decision.get("transaction_value_usd", decision.get("allocation_amount", 0)))
+        pct_to_trim = float(decision.get("position_action_percentage", 0))
         bucket = decision.get("strategy_bucket", "MACRO_SWING").upper()
         rationale = decision.get("analysis_display", "")
         
@@ -423,53 +425,103 @@ def execute_trades(agent_decisions, portfolio, buy_candidates, risk_matrix, tota
                 current_price = risk_matrix.get(pk, {}).get("current_price", pos["entry_price"])
                 
                 if action == "SELL":
-                    portfolio["cash_balance"] += pos["shares"] * current_price
+                    total_reclaimed = pos["shares"] * current_price
+                    portfolio["cash_balance"] += total_reclaimed
                     del portfolio["positions"][pk]
-                    msg = f"🔴 *CORE STRUCTURAL EXIT: {ticker}*\n\nReason: {rationale}"
+                    
+                    msg = f"🔴 *TOTAL POSITION LIQUIDATION: {ticker}*\n\nAction: Selling 100% of holdings\nTotal Capital Reclaimed: ${round(total_reclaimed, 2)}\nReasoning: {rationale}"
                     log_and_print(f"{RED}{msg}{RESET}"); send_notification(msg)
+                    
                 elif action == "TRIM":
-                    trim_amount = min(amount, pos["shares"] * current_price)
+                    # Determine trim amount via explicit AI percentage, or fallback to AI dollar value
+                    if pct_to_trim > 0:
+                        trim_amount = (pos["shares"] * current_price) * (pct_to_trim / 100.0)
+                    else:
+                        trim_amount = min(value, pos["shares"] * current_price)
+                        pct_to_trim = (trim_amount / (pos["shares"] * current_price)) * 100 if pos["shares"] > 0 else 0
+                        
                     portfolio["cash_balance"] += trim_amount
                     pos["shares"] -= (trim_amount / current_price)
                     pos["allocated_capital"] = pos["shares"] * pos["entry_price"]
-                    msg = f"✂️ *TREND MITIGATION TRIM: {ticker}*\n\nReason: {rationale}"
+                    
+                    msg = f"🟠 *PORTFOLIO POSITION TRIM: {ticker}*\n\nAction: Liquidating {round(pct_to_trim, 1)}% of position\nCash Value Reclaimed: ${round(trim_amount, 2)}\nReasoning: {rationale}"
                     log_and_print(f"{YELLOW}{msg}{RESET}"); send_notification(msg)
             
         elif action == "BUY" and ticker in buy_candidates:
-            if (portfolio["cash_balance"] - amount) < CASH_RESERVE_FLOOR:
-                amount = max(0.0, portfolio["cash_balance"] - CASH_RESERVE_FLOOR)
+            if (portfolio["cash_balance"] - value) < CASH_RESERVE_FLOOR:
+                value = max(0.0, portfolio["cash_balance"] - CASH_RESERVE_FLOOR)
                 
             current_exposure = sum(p["allocated_capital"] for pk, p in portfolio["positions"].items() if pk.startswith(ticker))
-            if current_exposure + amount > max_allocation:
-                amount = max(0.0, max_allocation - current_exposure)
+            if current_exposure + value > max_allocation:
+                value = max(0.0, max_allocation - current_exposure)
                 
-            if amount <= 500: continue
+            if value <= 500: continue
                 
             current_price = buy_candidates[ticker]["price"]
-            shares = amount / current_price
-            portfolio["cash_balance"] -= amount
+            shares = value / current_price
+            portfolio["cash_balance"] -= value
             pos_key = f"{ticker}_{bucket}"
             
             if pos_key in portfolio["positions"]:
                 old_shares = portfolio["positions"][pos_key]["shares"]
                 old_capital = portfolio["positions"][pos_key]["allocated_capital"]
                 portfolio["positions"][pos_key]["shares"] = old_shares + shares
-                portfolio["positions"][pos_key]["allocated_capital"] = old_capital + amount
-                portfolio["positions"][pos_key]["entry_price"] = (old_capital + amount) / (old_shares + shares)
+                portfolio["positions"][pos_key]["allocated_capital"] = old_capital + value
+                portfolio["positions"][pos_key]["entry_price"] = (old_capital + value) / (old_shares + shares)
             else:
                 portfolio["positions"][pos_key] = {
                     "entry_price": current_price,
                     "shares": shares,
-                    "allocated_capital": amount,
+                    "allocated_capital": value,
                     "strategy_bucket": bucket,
                     "purchase_date": datetime.now(ZoneInfo("America/New_York")).strftime('%Y-%m-%d'),
                     "buying_thesis": rationale
                 }
                 
-            msg = f"🟢 *STRATEGIC ACQUISITION: {ticker}*\n\nSetup: {buy_candidates[ticker]['setup_type']}\nAllocated: ${round(amount, 2)} @ ${current_price}\nThesis: {rationale}"
+            msg = f"🟢 *STRATEGIC ACQUISITION: {ticker}*\n\nSetup: {buy_candidates[ticker].get('setup_type', 'Standard')}\nAllocated: ${round(value, 2)} @ ${round(current_price, 2)}\nThesis: {rationale}"
             log_and_print(f"{GREEN}{msg}{RESET}"); send_notification(msg)
 
     save_portfolio(portfolio)
+
+    def check_and_send_weekly_summary(portfolio, risk_matrix, total_nav):
+    """
+    Evaluates system time. If running a weekend close or forced flag,
+    aggregates and transmits portfolio total value, cash position, and holding valuations.
+    """
+    import sys
+    
+    # Triggers automatically on Fridays (weekday 4), or via a custom command-line flag
+    if "--weekly-summary" in sys.argv or datetime.now(ZoneInfo("America/New_York")).weekday() == 4:
+        log_and_print(f"{YELLOW}[📊 System] Generating End-of-Week Portfolio Summary...{RESET}")
+        
+        cash = portfolio.get("cash_balance", 0)
+        total_holdings_value = total_nav - cash
+        
+        holdings_breakdown = ""
+        for ticker, details in risk_matrix.items():
+            current_val = details.get("current_value", 0)
+            weight = details.get("current_weight_pct", 0)
+            
+            if current_val > 0:
+                holdings_breakdown += f"  • *{ticker.split('_')[0]}*: ${round(current_val, 2)} ({round(weight, 1)}%)\n"
+        
+        if not holdings_breakdown:
+            holdings_breakdown = "  • No active stock positions (100% Cash)\n"
+            
+        summary_message = (
+            "🗓️ *END-OF-WEEK PORTFOLIO VALUATION REPORT*\n"
+            "===================================\n\n"
+            f"💰 *Total Net Asset Value (NAV):* ${round(total_nav, 2)}\n"
+            f"💵 *Available Cash Position:* ${round(cash, 2)}\n"
+            f"📈 *Total Stock Equity Value:* ${round(total_holdings_value, 2)}\n\n"
+            "📦 *Current Asset Allocations:*\n"
+            f"{holdings_breakdown}\n"
+            "===================================\n"
+            "🚨 _System status: Operational. Next risk matrix scan scheduled for Monday open._"
+        )
+        
+        send_notification(summary_message)
+        log_and_print(f"{GREEN}[📊 System] Weekly report delivered successfully.{RESET}")
 
 # ==========================================
 # 6. MAIN EXECUTION LOOP
@@ -496,6 +548,11 @@ if __name__ == "__main__":
     
     # 5. Broker Execution
     execute_trades(decisions, portfolio, buy_setups, risk_matrix, current_nav, is_correction)
+
+    # ---------------------------------------------------------
+    # FINAL STEP: Check if it's Friday and send the weekly wrap-up
+    # ---------------------------------------------------------
+    check_and_send_weekly_summary(portfolio, risk_matrix, total_nav)
     
     log_and_print(f"{CYAN}=================================================={RESET}")
     log_and_print(f"{CYAN}         ✅ SYSTEM OPERATION COMPLETED            {RESET}")
