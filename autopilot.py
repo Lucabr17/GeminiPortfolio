@@ -1,9 +1,24 @@
-import os
-import sys
-import json
-import time
-import logging
-import re
+"""
+GVD AUTONOMOUS PORTFOLIO SYSTEM — v3.1
+=======================================================
+Based on:
+  @theaiportfolios  — PWER ranking, 15-stock portfolio, opportunity cost engine
+  Jeremy Lefebvre   — GVD framework: Growth + Value + Dividend
+
+v3.1 improvements:
+  + Pre-earnings trim ONLY when position is up >=35% (profit protection, not fear)
+  + Gemini retry wrapper with exponential back-off (3 attempts each call)
+  + PWER batched in chunks of 15 to avoid token-limit failures
+  + PWER recalculated in Python from raw components — AI math not trusted
+  + Probability normalisation (sums to 1.0 even if AI is slightly off)
+  + ATR-based default position sizing (volatile stocks get smaller positions)
+  + Minimum 30-day holding period blocks discretionary agent sells (not hard stops)
+  + High-watermarks saved to disk every monitoring cycle
+  + Bucket balance check: flags overweight / underweight allocations each run
+  + Expanded sector-name map handles yfinance naming inconsistencies
+"""
+
+import os, sys, re, json, time, logging
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -14,546 +29,1534 @@ from google import genai
 from google.genai import types
 import warnings
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
-# ==========================================
-# 1. INITIALIZATION & CORE CREDENTIALS
-# ==========================================
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
+
+# ============================================================
+# UTILITY HELPERS
+# ============================================================
+def _strip_fences(text: str) -> str:
+    """Remove markdown code fences without triple-backtick literals in source."""
+    return re.sub(r"`{3}(?:json)?\s*", "", text).strip()
+
+
+def _normalize_bucket(raw: str) -> str:
+    r = raw.upper().strip()
+    if "GROWTH" in r or r == "G":  return BUCKET_G
+    if "VALUE"  in r or r == "V":  return BUCKET_V
+    if "DIVID"  in r or r == "D":  return BUCKET_D
+    return BUCKET_G
+
+
+def _verify_pwer(s: dict) -> dict:
+    """Recalculate PWER from components; normalise probabilities to sum = 1."""
+    bp = float(s.get("bull_prob", 0.25))
+    ap = float(s.get("base_prob", 0.50))
+    ep = float(s.get("bear_prob", 0.25))
+    total = bp + ap + ep
+    if total > 0:
+        bp, ap, ep = bp/total, ap/total, ep/total
+    s["bull_prob"] = round(bp, 4)
+    s["base_prob"] = round(ap, 4)
+    s["bear_prob"] = round(ep, 4)
+    pwer = (float(s.get("bull_ret_pct", 0)) * bp +
+            float(s.get("base_ret_pct", 0)) * ap +
+            float(s.get("bear_ret_pct", 0)) * ep)
+    s["pwer_pct"] = round(pwer, 2)
+    return s
+
+
+def _call_gemini(prompt: str, temperature: float = 0.10,
+                 thinking_level: str = "high", retries: int = 3) -> str:
+    """Call Gemini with exponential back-off on failure."""
+    last_err = None
+    for attempt in range(retries):
+        try:
+            r = ai_client.models.generate_content(
+                model=GEMINI_MODEL, contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=temperature,
+                    thinking_config=types.ThinkingConfig(
+                        thinking_level=thinking_level)),
+            )
+            return r.text.strip()
+        except Exception as e:
+            last_err = e
+            if attempt < retries - 1:
+                wait = 2 ** attempt
+                log_and_print(f"{YLW}[Gemini retry {attempt+1}] waiting {wait}s: {e}{RST}")
+                time.sleep(wait)
+    raise RuntimeError(f"Gemini failed after {retries} attempts: {last_err}")
+
+
+def _atr_size(ticker: str, nav: float, max_pct: float,
+              risk_pct: float = 0.01) -> float:
+    """
+    ATR-based position size.
+    Dollar risk = nav * risk_pct.  Stop = 2x ATR(14).
+    Capped at nav * max_pct.
+    High-volatility stocks automatically get smaller positions.
+    """
+    try:
+        h = yf.Ticker(ticker).history(period="60d")
+        if h.empty or len(h) < 14:
+            raise ValueError("insufficient history")
+        hi, lo, pc = h["High"], h["Low"], h["Close"].shift(1)
+        tr     = pd.concat([hi - lo,
+                            (hi - pc).abs(),
+                            (lo - pc).abs()], axis=1).max(axis=1)
+        atr    = float(tr.iloc[-14:].mean())
+        price  = float(h["Close"].iloc[-1])
+        shares = (nav * risk_pct) / (atr * 2)
+        return min(shares * price, nav * max_pct)
+    except Exception:
+        return nav * max_pct * 0.50  # fallback: half the max
+
+
+# ============================================================
+# CONSTANTS
+# ============================================================
+BUCKET_G = "GROWTH";   MAX_G = 0.50; CAP_G = 0.12; TRAIL_G = 20
+BUCKET_V = "VALUE";    MAX_V = 0.35; CAP_V = 0.10; TRAIL_V = 15
+BUCKET_D = "DIVIDEND"; MAX_D = 0.15; CAP_D = 0.08; TRAIL_D = 10
+
+TARGET_POSITIONS      = 15
+MIN_HOLD_DAYS         = 30    # no discretionary sells before this age
+EARNINGS_TRIM_PNL_MIN = 35    # % gain required before pre-earnings trim fires
+PWER_CHUNK            = 15    # max candidates per PWER API call
+
+
+# ============================================================
+# 1. INITIALIZATION
+# ============================================================
+GEMINI_API_KEY     = os.getenv("GEMINI_API_KEY",     "YOUR_GEMINI_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "YOUR_TELEGRAM_CHAT_ID")
+TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID",   "YOUR_TELEGRAM_CHAT_ID")
+GEMINI_MODEL       = os.getenv("GEMINI_MODEL",        "gemini-3.1-pro-preview")
 
-logging.basicConfig(
-    filename='agent.log', 
-    level=logging.INFO, 
-    format='%(asctime)s | %(levelname)s | %(message)s'
-)
+logging.basicConfig(filename="agent.log", level=logging.INFO,
+                    format="%(asctime)s | %(levelname)s | %(message)s")
 
-def log_and_print(message):
-    print(message)
-    clean_msg = re.sub(r'\033\[[0-9;]*m', '', message)
-    logging.info(clean_msg)
+
+def log_and_print(msg: str) -> None:
+    print(msg)
+    logging.info(re.sub(r"\033\[[0-9;]*m", "", msg))
+
 
 try:
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
 except Exception as e:
-    log_and_print(f"CRITICAL: Gemini Client failed to initialize: {e}")
-    sys.exit(1)
+    print(f"CRITICAL: Gemini init failed: {e}"); sys.exit(1)
 
-GREEN = "\033[1;32m"
-RED = "\033[1;31m"
-CYAN = "\033[1;36m"
-YELLOW = "\033[1;33m"
-RESET = "\033[0m"
+GRN = "\033[1;32m"; RED = "\033[1;31m"; CYN = "\033[1;36m"
+YLW = "\033[1;33m"; RST = "\033[0m"
 
-# ==========================================
-# 2. PORTFOLIO & MARKET REGIME
-# ==========================================
-def load_portfolio():
+
+# ============================================================
+# 2. PORTFOLIO PERSISTENCE
+# ============================================================
+def load_portfolio() -> dict:
     try:
-        with open("portfolio.json", "r") as f:
+        with open("portfolio.json") as f:
             return json.load(f)
     except FileNotFoundError:
-        return {"cash_balance": 100000.0, "positions": {}}
+        return {"cash_balance": 100_000.0, "positions": {}}
 
-def save_portfolio(data):
+
+def save_portfolio(d: dict) -> None:
     with open("portfolio.json", "w") as f:
-        json.dump(data, f, indent=4)
+        json.dump(d, f, indent=4)
 
-def send_notification(message):
+
+def send_notification(msg: str) -> None:
     if not TELEGRAM_BOT_TOKEN or "YOUR_" in TELEGRAM_BOT_TOKEN:
         return
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    url = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendMessage"
     try:
-        requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}, timeout=10)
+        requests.post(url,
+                      json={"chat_id": TELEGRAM_CHAT_ID,
+                            "text": msg, "parse_mode": "Markdown"},
+                      timeout=10)
     except Exception as e:
-        log_and_print(f"Telegram notification failed: {e}")
+        log_and_print(f"Telegram: {e}")
 
-def get_macro_universe():
-    """Fetches S&P500 + Nasdaq 100 + Strategic Alpha Overlays."""
-    tickers = set()
-    log_and_print(f"{CYAN}[🌐 Universe] Compiling macro universe...{RESET}")
-    
+
+# ============================================================
+# 3. UNIVERSE  (S&P 500 + Nasdaq 100 + strategic picks)
+# ============================================================
+def get_macro_universe() -> list:
+    tickers: set = set()
+    log_and_print(f"{CYN}[Universe] Compiling universe...{RST}")
+    hdrs = {"User-Agent": "Mozilla/5.0"}
+
     try:
-        sp500 = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]['Symbol'].tolist()
-        tickers.update(sp500)
+        r = requests.get(
+            "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
+            headers=hdrs, timeout=15)
+        tickers.update(pd.read_html(r.text)[0]["Symbol"].tolist())
     except Exception as e:
-        log_and_print(f"Warning: Failed to fetch S&P 500. {e}")
+        log_and_print(f"Warning S&P500: {e}")
 
     try:
-        ndx_tables = pd.read_html('https://en.wikipedia.org/wiki/Nasdaq-100', match='Ticker|Symbol')
-        ndx_col = 'Ticker' if 'Ticker' in ndx_tables[0].columns else 'Symbol'
-        tickers.update(ndx_tables[0][ndx_col].tolist())
+        r = requests.get("https://en.wikipedia.org/wiki/Nasdaq-100",
+                         headers=hdrs, timeout=15)
+        tbls = pd.read_html(r.text, match="Ticker|Symbol")
+        col  = "Ticker" if "Ticker" in tbls[0].columns else "Symbol"
+        tickers.update(tbls[0][col].tolist())
     except Exception as e:
-        log_and_print(f"Warning: Failed to fetch Nasdaq 100. {e}")
+        log_and_print(f"Warning Nasdaq100: {e}")
 
-    strategic_alpha = ["NOW", "SHOP", "AXON", "SNOW", "CRM", "PLTR", "AMD", "QCOM", "MU", "ZETA", "COIN", "HOOD", "VST", "CELH", "AVGO", "MSFT", "LLY"]
-    tickers.update(strategic_alpha)
+    strategic = [
+        # G: AI & Semiconductors
+        "NVDA", "AMD", "AVGO", "QCOM", "MU", "ARM", "ALAB", "MRVL",
+        # G: AI Software & Cloud
+        "NOW", "CRM", "PLTR", "AXON", "APP", "ZETA", "MSFT", "SNOW",
+        # G: Energy / Power infrastructure
+        "VST", "CEG", "NRG", "TALEN",
+        # G: Defense & Space
+        "RKLB", "KTOS", "LMT", "RTX",
+        # G: Fintech / Consumer
+        "MELI", "NU", "HOOD", "COIN", "SQ",
+        # V: Quality compounders at value
+        "BRK-B", "JPM", "BAC", "WFC", "UNH", "LLY", "ABBV", "BMY",
+        "GOOG", "META", "AMZN", "AAPL", "ADBE", "ORCL",
+        # D: Dividend payers
+        "JNJ", "PG", "KO", "VZ", "T", "MO", "XOM", "CVX",
+        "NEE", "D", "O", "MAIN",
+    ]
+    tickers.update(strategic)
+    cleaned = [str(t).replace(".", "-") for t in tickers if isinstance(t, str)]
+    log_and_print(f"{CYN}[Universe] {len(cleaned)} tickers ready.{RST}")
+    return list(set(cleaned))
 
-    cleaned_tickers = [str(t).replace('.', '-') for t in tickers if isinstance(t, str)]
-    log_and_print(f"{CYAN}[🌐 Universe] Total tracked equities: {len(cleaned_tickers)}{RESET}")
-    return list(set(cleaned_tickers))
 
-def check_market_regime():
-    """Checks if the broader market is in a structural correction (>5% drawdown)."""
-    log_and_print(f"{CYAN}[🔍 Regime] Assessing broader market drawdown levels...{RESET}")
-    try:
-        spy = yf.Ticker("^GSPC").history(period="60d")
-        if spy.empty: 
-            return False, 0.0
-            
-        high_60d = spy['High'].max()
-        current_close = spy['Close'].iloc[-1]
-        drawdown_pct = ((high_60d - current_close) / high_60d) * 100
-        
-        is_correction = drawdown_pct >= 5.0
-        log_and_print(f"{CYAN}[🔍 Regime] S&P 500 Drawdown: {round(drawdown_pct, 2)}% | Correction Mode: {is_correction}{RESET}")
-        return is_correction, drawdown_pct
-    except Exception as e:
-        log_and_print(f"Warning: Failed to check market regime. Defaulting to safe mode. {e}")
-        return False, 0.0
+# ============================================================
+# 4. MACRO REGIME  (5-factor model)
+# ============================================================
+def check_market_regime() -> dict:
+    log_and_print(f"{CYN}[Regime] Running 5-factor macro assessment...{RST}")
+    rs = 0; signals: dict = {}
 
-# ==========================================
-# 3. INSTITUTIONAL QUALITY SCREENER
-# ==========================================
-def run_macro_screener(tickers):
+    def _f(ticker: str, period: str) -> pd.DataFrame:
+        try:
+            return yf.Ticker(ticker).history(period=period)
+        except Exception:
+            return pd.DataFrame()
+
+    spy  = _f("^GSPC", "60d");  vix  = _f("^VIX", "30d")
+    t10  = _f("^TNX",  "5d");   t5   = _f("^FVX", "5d")
+    hyg  = _f("HYG",   "30d");  ief  = _f("IEF",  "30d")
+    mmth = _f("^MMTH", "10d")
+
+    # Factor 1: SPY drawdown from 60-day high
+    if not spy.empty:
+        dd = ((spy["High"].max() - spy["Close"].iloc[-1]) /
+              spy["High"].max()) * 100
+        signals["spy_drawdown"] = round(dd, 2)
+        rs += 30 if dd >= 10 else (15 if dd >= 5 else 0)
+
+    # Factor 2: VIX level
+    if not vix.empty:
+        v = float(vix["Close"].iloc[-1])
+        signals["vix"] = round(v, 2)
+        rs += 30 if v >= 35 else (20 if v >= 25 else (8 if v >= 18 else 0))
+
+    # Factor 3: Yield curve (10Y - 5Y spread)
+    if not t10.empty and not t5.empty:
+        sp = float(t10["Close"].iloc[-1]) - float(t5["Close"].iloc[-1])
+        signals["yield_spread"] = round(sp, 3)
+        rs += 20 if sp < -0.5 else (10 if sp < 0 else 0)
+
+    # Factor 4: Credit spreads proxy (HYG vs IEF 30-day return delta)
+    if not hyg.empty and not ief.empty:
+        dl = ((hyg["Close"].iloc[-1] / hyg["Close"].iloc[0] - 1) -
+              (ief["Close"].iloc[-1] / ief["Close"].iloc[0] - 1)) * 100
+        signals["credit_delta"] = round(dl, 2)
+        rs += 20 if dl < -5 else (10 if dl < -2 else 0)
+
+    # Factor 5: Market breadth (% of S&P above 200-DMA)
+    if not mmth.empty:
+        br = float(mmth["Close"].iloc[-1])
+        signals["breadth_pct"] = round(br, 1)
+        rs += 20 if br < 30 else (10 if br < 50 else 0)
+
+    if rs >= 60:
+        regime, cf, gp, vp, dp, ng = "BEAR",    0.40, 0.05, 0.07, 0.05, False
+    elif rs >= 30:
+        regime, cf, gp, vp, dp, ng = "CAUTION", 0.15, 0.08, 0.10, 0.08, True
+    else:
+        regime, cf, gp, vp, dp, ng = "BULL",    0.04, 0.12, 0.10, 0.08, True
+
+    out = {
+        "regime": regime, "risk_score": rs, "signals": signals,
+        "cash_floor_pct": cf,
+        "max_pos_pct": {BUCKET_G: gp, BUCKET_V: vp, BUCKET_D: dp},
+        "new_growth_buys_allowed":   ng,
+        "new_value_buys_allowed":    True,
+        "new_dividend_buys_allowed": True,
+    }
+    log_and_print(f"{CYN}[Regime] {regime} | Score {rs}/120 | {signals}{RST}")
+    return out
+
+
+# ============================================================
+# 5. MACRO TAILWIND SCANNER
+# ============================================================
+def scan_macro_tailwinds() -> tuple:
     """
-    Quality Growth + 200-Week EMA Institutional Support Matrix.
-    Prioritizes wide moats trading near historic structural baselines.
+    Measures 6-month performance of 8 thematic ETF clusters vs SPY.
+    Active tailwind  = outperforms SPY by >=5%.
+    Strong tailwind  = outperforms SPY by >=15%.
+    Only stocks aligned with active tailwinds enter Bucket G.
     """
-    log_and_print(f"{CYAN}[⚙️ Matrix] Running institutional quality and 200-Week EMA screener...{RESET}")
-    scored_candidates = {}
-    
+    log_and_print(f"{CYN}[Tailwinds] Scanning 8 thematic clusters...{RST}")
+
+    CLUSTERS = {
+        "AI_SEMICONDUCTORS":  ["SOXX", "SMH"],
+        "AI_SOFTWARE_CLOUD":  ["IGV",  "WCLD"],
+        "ENERGY_POWER_INFRA": ["XLU",  "XLE"],
+        "DEFENSE_AEROSPACE":  ["ITA",  "XAR"],
+        "HEALTHCARE_BIOTECH": ["XBI",  "IBB"],
+        "FINTECH_PAYMENTS":   ["FINX", "IPAY"],
+        "CYBERSECURITY":      ["CIBR", "HACK"],
+        "CONSUMER_RECOVERY":  ["XLY",  "XRT"],
+    }
+
+    # yfinance sector strings vary — map both common variants
+    SECTOR_MAP = {
+        "Technology":             ["AI_SEMICONDUCTORS", "AI_SOFTWARE_CLOUD", "CYBERSECURITY"],
+        "Information Technology": ["AI_SEMICONDUCTORS", "AI_SOFTWARE_CLOUD", "CYBERSECURITY"],
+        "Communication Services": ["AI_SOFTWARE_CLOUD"],
+        "Energy":                 ["ENERGY_POWER_INFRA"],
+        "Utilities":              ["ENERGY_POWER_INFRA"],
+        "Industrials":            ["DEFENSE_AEROSPACE"],
+        "Healthcare":             ["HEALTHCARE_BIOTECH"],
+        "Health Care":            ["HEALTHCARE_BIOTECH"],
+        "Financial Services":     ["FINTECH_PAYMENTS"],
+        "Financials":             ["FINTECH_PAYMENTS"],
+        "Consumer Cyclical":      ["CONSUMER_RECOVERY"],
+        "Consumer Discretionary": ["CONSUMER_RECOVERY"],
+        "Consumer Defensive":     ["CONSUMER_RECOVERY"],
+        "Consumer Staples":       ["CONSUMER_RECOVERY"],
+    }
+
+    try:
+        spy_h  = yf.Ticker("SPY").history(period="6mo")["Close"]
+        spy_6m = (spy_h.iloc[-1] / spy_h.iloc[0] - 1) * 100
+    except Exception:
+        spy_6m = 0.0
+
+    active: dict = {}
+    for cluster, etfs in CLUSTERS.items():
+        rets = []
+        for etf in etfs:
+            try:
+                h = yf.Ticker(etf).history(period="6mo")["Close"]
+                if not h.empty:
+                    rets.append((h.iloc[-1] / h.iloc[0] - 1) * 100)
+            except Exception:
+                pass
+        if rets:
+            avg    = float(np.mean(rets))
+            excess = avg - spy_6m
+            if excess >= 5:
+                active[cluster] = {
+                    "6m_ret_pct":    round(avg, 1),
+                    "excess_vs_spy": round(excess, 1),
+                    "strength":      "STRONG" if excess >= 15 else "MODERATE",
+                }
+
+    log_and_print(f"{CYN}[Tailwinds] Active ({len(active)}): {list(active.keys())}{RST}")
+    return active, SECTOR_MAP
+
+
+# ============================================================
+# 6. INTRINSIC VALUE ENGINE
+# ============================================================
+def calculate_intrinsic_value(info: dict) -> dict:
+    """
+    Method 1 — Graham Number:  sqrt(22.5 * EPS * BVPS)
+    Method 2 — FCF Yield:      FCF/share / (discount - terminal_growth)
+    Fair value = average of valid methods.
+    Requires >=15% margin of safety to flag as undervalued.
+    """
+    price  = info.get("currentPrice") or info.get("regularMarketPrice") or 0
+    eps    = info.get("trailingEps")   or 0
+    bvps   = info.get("bookValue")     or 0
+    fcf    = info.get("freeCashflow")  or 0
+    shares = info.get("sharesOutstanding") or 1
+    rev_g  = float(info.get("revenueGrowth") or 0)
+
+    vals: list = []
+
+    if eps > 0 and bvps > 0:
+        vals.append((22.5 * eps * bvps) ** 0.5)
+
+    if fcf > 0 and shares > 0:
+        tg = min(max(rev_g, 0.0), 0.03)
+        dr = 0.10
+        if dr > tg:
+            vals.append((fcf / shares) / (dr - tg))
+
+    if not vals or price <= 0:
+        return {"intrinsic_value": 0, "margin_of_safety_pct": 0, "undervalued": False}
+
+    fv  = float(np.mean(vals))
+    mos = ((fv - price) / fv) * 100
+    return {
+        "intrinsic_value":      round(fv, 2),
+        "current_price":        round(price, 2),
+        "margin_of_safety_pct": round(mos, 1),
+        "undervalued":          mos >= 15,
+    }
+
+
+# ============================================================
+# 7. EARNINGS LANDMINE GUARD
+# ============================================================
+def get_earnings_landmines(tickers: list, days_ahead: int = 14) -> dict:
+    """Block new buys within 14 days of an earnings event."""
+    mines: dict = {}
     for ticker in tickers:
         try:
-            ticker_obj = yf.Ticker(ticker)
-            daily_hist = ticker_obj.history(period="250d")
-            if daily_hist.empty or len(daily_hist) < 200: continue
-            
-            d_closes = daily_hist['Close']
-            current_price = float(d_closes.iloc[-1])
-            sma_200 = float(d_closes.iloc[-200:].mean())
+            cal = yf.Ticker(ticker).calendar
+            if cal is None:
+                continue
+            if hasattr(cal, "index") and "Earnings Date" in cal.index:
+                dt = cal.loc["Earnings Date"].iloc[0]
+            elif isinstance(cal, dict) and "Earnings Date" in cal:
+                raw = cal["Earnings Date"]
+                dt  = raw[0] if isinstance(raw, list) else raw
+            else:
+                continue
+            if pd.notna(dt):
+                d = (pd.Timestamp(dt) - pd.Timestamp.now()).days
+                if -5 <= d <= days_ahead:
+                    mines[ticker] = {"date": str(pd.Timestamp(dt).date()), "days": d}
+        except Exception:
+            continue
+    if mines:
+        log_and_print(f"{YLW}[Earnings] {len(mines)} blocked: {list(mines.keys())}{RST}")
+    return mines
 
-            info = ticker_obj.info
-            roe = info.get('returnOnEquity') or 0
-            rev_growth = info.get('revenueGrowth') or 0
-            fwd_pe = info.get('forwardPE') or 0
-            operating_cash = info.get('operatingCashflow') or 0
-            
-            # Strict Baseline Quality Filter
-            if roe < 0.12 or operating_cash <= 0 or rev_growth <= 0:
+
+# ============================================================
+# 8. THREE-BUCKET SCREENERS
+# ============================================================
+def run_growth_screener(tickers: list, active_tailwinds: dict,
+                        sector_map: dict) -> dict:
+    """
+    BUCKET G — Quality growth stocks aligned with confirmed macro tailwinds.
+    Every qualifying stock must map to at least one active tailwind cluster.
+
+    Scoring (minimum 45 to qualify):
+      Tailwind strength  (0-30)
+      200W EMA support   (0-25)
+      Revenue growth     (0-20)
+      ROE / FCF / Margins (0-25)
+      6M relative strength (0-10)
+      PEG sanity check    (0-5)
+    """
+    log_and_print(f"{CYN}[G] Growth screener...{RST}")
+    candidates: dict = {}
+    active_clusters  = set(active_tailwinds.keys())
+
+    try:
+        spy   = yf.Ticker("SPY").history(period="1y")["Close"]
+        spy6m = (spy.iloc[-1] / spy.iloc[-126] - 1) * 100 if len(spy) >= 126 else 0.0
+    except Exception:
+        spy6m = 0.0
+
+    for ticker in tickers:
+        try:
+            t    = yf.Ticker(ticker)
+            hd   = t.history(period="1y")
+            info = t.info
+            if hd.empty or len(hd) < 200:
                 continue
 
-            # Calculate 200-Week EMA
-            weekly_hist = ticker_obj.history(period="5y", interval="1wk")
-            if len(weekly_hist) < 200: continue
-            w_closes = weekly_hist['Close'].dropna()
-            
-            ema_200_series = w_closes.ewm(span=200, adjust=False).mean()
-            current_w_ema200 = float(ema_200_series.iloc[-1])
-            
-            # Check proximity to 200-Week EMA (Within 4% above or 2% below)
-            price_to_ema_ratio = current_price / current_w_ema200
-            is_touching_weekly_ema200 = (0.98 <= price_to_ema_ratio <= 1.04)
+            c   = hd["Close"]
+            p   = float(c.iloc[-1])
+            roe = float(info.get("returnOnEquity")   or 0)
+            opc = float(info.get("operatingCashflow") or 0)
+            rg  = float(info.get("revenueGrowth")    or 0)
 
-            score = 0
-            setup_tag = "Standard Trend Growth"
-            
-            if is_touching_weekly_ema200:
-                score += 50
-                setup_tag = "GENERATIONAL 200-WEEK EMA SUPPORT"
-            elif current_price > sma_200:
-                score += 20  
-                
-            if roe >= 0.22: score += 15
-            if rev_growth >= 0.15: score += 15
-            if 0 < fwd_pe <= 35: score += 10
+            if roe < 0.10 or opc <= 0 or rg < 0.10:
+                continue
 
-            if score >= 40:
-                scored_candidates[ticker] = {
-                    "price": round(current_price, 2),
-                    "macro_score": score,
-                    "setup_type": setup_tag,
-                    "weekly_ema_200": round(current_w_ema200, 2),
-                    "return_on_equity_pct": round(roe * 100, 2),
-                    "rev_growth_pct": round(rev_growth * 100, 2),
-                    "forward_pe": round(fwd_pe, 2) if fwd_pe else "N/A"
+            sector  = info.get("sector", "")
+            aligned = [cl for cl in sector_map.get(sector, [])
+                       if cl in active_clusters]
+            if not aligned:
+                continue
+
+            ts     = max(active_tailwinds[cl]["excess_vs_spy"] for cl in aligned)
+            sma200 = float(c.iloc[-200:].mean())
+            rs6m   = ((p / float(c.iloc[-126]) - 1) * 100
+                      if len(c) >= 126 else 0) - spy6m
+
+            mktcap = float(info.get("marketCap")    or 0)
+            fcf    = float(info.get("freeCashflow")  or 0)
+            fcy    = (fcf / mktcap) if mktcap > 0 else 0
+            peg    = float(info.get("pegRatio")      or 0)
+            gm     = float(info.get("grossMargins")  or 0)
+
+            hw = t.history(period="5y", interval="1wk")
+            ema200w = None
+            if len(hw) >= 200:
+                ema200w = float(
+                    hw["Close"].dropna().ewm(span=200, adjust=False)
+                    .mean().iloc[-1])
+
+            sc = 0; tags = []
+
+            if   ts >= 15: sc += 30; tags.append("STRONG_TAILWIND")
+            elif ts >=  5: sc += 15; tags.append("MOD_TAILWIND")
+
+            if ema200w and 0.98 <= p / ema200w <= 1.04:
+                sc += 25; tags.append("200W_EMA_SUPPORT")
+            elif p > sma200:
+                sc += 10; tags.append("ABOVE_200D_SMA")
+
+            if   rg >= 0.30: sc += 20; tags.append("HYPERGROWTH_30PCT")
+            elif rg >= 0.20: sc += 12; tags.append("HIGH_GROWTH_20PCT")
+            elif rg >= 0.10: sc +=  6
+
+            if   roe >= 0.25: sc += 10; tags.append("HIGH_ROE")
+            elif roe >= 0.15: sc +=  5
+            if   fcy >= 0.03: sc +=  8; tags.append("FCF_POSITIVE")
+            if   gm  >= 0.50: sc +=  7; tags.append("HIGH_MARGINS")
+
+            if   rs6m >= 10: sc += 10; tags.append("STRONG_RS_6M")
+            elif rs6m >=  0: sc +=  5
+
+            if 0 < peg <= 1.5: sc += 5; tags.append("GOOD_PEG")
+
+            if sc >= 45:
+                candidates[ticker] = {
+                    "bucket":          BUCKET_G,
+                    "price":           round(p, 2),
+                    "score":           sc,
+                    "tags":            " | ".join(tags),
+                    "sector":          sector,
+                    "tailwinds":       aligned,
+                    "tailwind_excess": round(ts, 1),
+                    "rev_growth_pct":  round(rg * 100, 1),
+                    "roe_pct":         round(roe * 100, 1),
+                    "fcf_yield_pct":   round(fcy * 100, 2),
+                    "rs_6m":           round(rs6m, 1),
+                    "ema200w":         round(ema200w, 2) if ema200w else "N/A",
                 }
-            time.sleep(0.05)
-        except:
+            time.sleep(0.04)
+        except Exception:
             continue
 
-    return dict(sorted(scored_candidates.items(), key=lambda x: x[1]['macro_score'], reverse=True)[:12])
+    log_and_print(f"{CYN}[G] {len(candidates)} qualified.{RST}")
+    return dict(sorted(candidates.items(),
+                       key=lambda x: x[1]["score"], reverse=True)[:12])
 
-# ==========================================
-# 4. LIVING FUNDAMENTAL RISK MONITOR (WITH MACD)
-# ==========================================
-def evaluate_open_positions(portfolio):
+
+def run_value_screener(tickers: list) -> dict:
     """
-    Monitors structural integrity. Allows winners to run unchecked unless 
-    technical or fundamental pillars fail. Uses Weekly MACD to spot bullish divergences.
+    BUCKET V — Quality businesses trading below intrinsic value.
+    Works in ALL market conditions; powerful in downturns.
+    Requires >=15% margin of safety. Min market cap $5B (avoid value traps).
     """
-    risk_matrix = {}
-    positions_value = 0
-    temp_prices = {}
-    
-    log_and_print(f"{YELLOW}[📊 Audit] Evaluating structural trend and MACD momentum for portfolio holdings...{RESET}")
-    
-    for pos_key, pos_data in portfolio.get("positions", {}).items():
-        ticker = pos_key.split('_')[0]
+    log_and_print(f"{CYN}[V] Value screener...{RST}")
+    candidates: dict = {}
+
+    for ticker in tickers:
         try:
-            current_price = float(yf.Ticker(ticker).history(period="5d")['Close'].iloc[-1])
-            temp_prices[pos_key] = current_price
-            positions_value += pos_data["shares"] * current_price
-        except:
-            temp_prices[pos_key] = pos_data["entry_price"]
-            positions_value += pos_data["allocated_capital"]
+            t    = yf.Ticker(ticker)
+            info = t.info
+            hd   = t.history(period="1y")
+            if hd.empty or len(hd) < 100:
+                continue
+
+            p      = float(info.get("currentPrice") or
+                           info.get("regularMarketPrice") or 0)
+            roe    = float(info.get("returnOnEquity")    or 0)
+            opc    = float(info.get("operatingCashflow") or 0)
+            mktcap = float(info.get("marketCap")         or 0)
+            fcf    = float(info.get("freeCashflow")      or 0)
+            de     = float(info.get("debtToEquity")      or 0)
+
+            if p <= 0 or roe < 0.08 or opc <= 0 or de > 200:
+                continue
+            if mktcap < 5_000_000_000:
+                continue
+
+            iv = calculate_intrinsic_value(info)
+            if not iv["undervalued"]:
+                continue
+
+            fcy = (fcf / mktcap) if mktcap > 0 else 0
+            pb  = float(info.get("priceToBook") or 99)
+            fpe = float(info.get("forwardPE")   or  0)
+            dy  = float(info.get("dividendYield") or 0)
+
+            sc = 0; tags = []
+            mos = iv["margin_of_safety_pct"]
+
+            if   mos >= 40: sc += 40; tags.append(f"DEEP_VALUE_MOS{int(mos)}PCT")
+            elif mos >= 25: sc += 25; tags.append(f"GOOD_VALUE_MOS{int(mos)}PCT")
+            elif mos >= 15: sc += 15; tags.append(f"VALUE_MOS{int(mos)}PCT")
+
+            if   roe >= 0.20: sc += 15; tags.append("HIGH_ROE")
+            elif roe >= 0.12: sc +=  8
+
+            if   fcy >= 0.06: sc += 12; tags.append("HIGH_FCF_YIELD")
+            elif fcy >= 0.04: sc +=  7
+
+            if pb < 2.0 and roe > 0.12:
+                sc += 10; tags.append("LOW_PB_HIGH_ROE")
+
+            if   0 < fpe < 15: sc +=  8; tags.append("LOW_FWD_PE")
+            elif 0 < fpe < 20: sc +=  4
+
+            if dy >= 0.02: sc += 5; tags.append("DIV_BONUS")
+
+            if sc >= 35:
+                candidates[ticker] = {
+                    "bucket":               BUCKET_V,
+                    "price":                round(p, 2),
+                    "score":                sc,
+                    "tags":                 " | ".join(tags),
+                    "sector":               info.get("sector", "Unknown"),
+                    "intrinsic_value":      iv["intrinsic_value"],
+                    "margin_of_safety_pct": mos,
+                    "roe_pct":              round(roe * 100, 1),
+                    "fcf_yield_pct":        round(fcy * 100, 2),
+                    "pb_ratio":             round(pb, 2),
+                    "forward_pe":           round(fpe, 1) if fpe else "N/A",
+                    "div_yield_pct":        round(dy * 100, 2),
+                }
+            time.sleep(0.04)
+        except Exception:
+            continue
+
+    log_and_print(f"{CYN}[V] {len(candidates)} qualified.{RST}")
+    return dict(sorted(candidates.items(),
+                       key=lambda x: x[1]["score"], reverse=True)[:10])
+
+
+def run_dividend_screener(tickers: list) -> dict:
+    """
+    BUCKET D — Income-generating quality dividend payers.
+    Portfolio buffer: reduces volatility, provides income in flat/down markets.
+    Requirements: yield >=2%, payout <=65%, FCF covers dividend.
+    """
+    log_and_print(f"{CYN}[D] Dividend screener...{RST}")
+    candidates: dict = {}
+
+    for ticker in tickers:
+        try:
+            t    = yf.Ticker(ticker)
+            info = t.info
+
+            dy  = float(info.get("dividendYield")    or 0)
+            pr  = float(info.get("payoutRatio")       or 1)
+            fcf = float(info.get("freeCashflow")      or 0)
+            dp  = float(info.get("dividendsPaid")     or 0)
+            opc = float(info.get("operatingCashflow") or 0)
+            roe = float(info.get("returnOnEquity")    or 0)
+
+            if dy < 0.02 or pr > 0.65 or pr <= 0 or opc <= 0:
+                continue
+
+            cov = fcf / abs(dp) if dp != 0 else 0
+            if cov < 1.0 and dp != 0:
+                continue
+
+            sc = 0; tags = []
+
+            if   dy >= 0.050: sc += 25; tags.append(f"HIGH_YIELD_{round(dy*100,1)}PCT")
+            elif dy >= 0.035: sc += 15; tags.append(f"SOLID_YIELD_{round(dy*100,1)}PCT")
+            elif dy >= 0.020: sc +=  8
+
+            if   pr < 0.35: sc += 15; tags.append("CONSERVATIVE_PAYOUT")
+            elif pr < 0.50: sc +=  8
+
+            if   cov >= 2.0: sc += 15; tags.append("STRONG_FCF_COV")
+            elif cov >= 1.5: sc +=  8
+
+            if   roe >= 0.20: sc += 10; tags.append("HIGH_ROE")
+            elif roe >= 0.12: sc +=  5
+
+            try:
+                dh = t.dividends
+                if len(dh) > 0:
+                    yrs = (dh.index[-1] - dh.index[0]).days / 365
+                    if yrs >= 5:
+                        f4 = dh.iloc[:4].mean()
+                        l4 = dh.iloc[-4:].mean()
+                        dg = (l4 / f4 - 1) / yrs if f4 > 0 else 0
+                        if   dg >= 0.05: sc += 15; tags.append("GROWING_DIV_5PCT_PA")
+                        elif dg >= 0.00: sc +=  5
+            except Exception:
+                pass
+
+            if sc >= 30:
+                p = float(info.get("currentPrice") or
+                          info.get("regularMarketPrice") or 0)
+                candidates[ticker] = {
+                    "bucket":           BUCKET_D,
+                    "price":            round(p, 2),
+                    "score":            sc,
+                    "tags":             " | ".join(tags),
+                    "sector":           info.get("sector", "Unknown"),
+                    "div_yield_pct":    round(dy * 100, 2),
+                    "payout_ratio_pct": round(pr * 100, 1),
+                    "fcf_coverage":     round(cov, 2),
+                    "roe_pct":          round(roe * 100, 1),
+                }
+            time.sleep(0.04)
+        except Exception:
+            continue
+
+    log_and_print(f"{CYN}[D] {len(candidates)} qualified.{RST}")
+    return dict(sorted(candidates.items(),
+                       key=lambda x: x[1]["score"], reverse=True)[:6])
+
+
+# ============================================================
+# 9. PWER ENGINE  (chunked + Python-verified)
+# ============================================================
+
+# Output format constant — avoids any inline problematic string literals
+_PWER_FORMAT = (
+    '{"pwer_scores":['
+    '{"ticker":"X","bucket":"GROWTH",'
+    '"bull_ret_pct":40,"bull_prob":0.25,'
+    '"base_ret_pct":15,"base_prob":0.50,'
+    '"bear_ret_pct":-20,"bear_prob":0.25,'
+    '"pwer_pct":11.25,'
+    '"key_catalyst":"one sentence",'
+    '"key_risk":"one sentence",'
+    '"conviction":"HIGH|MEDIUM|LOW"}'
+    "]}"
+)
+
+
+def calculate_pwer_batch(all_candidates: dict, regime: dict) -> dict:
+    """
+    Probability-Weighted Expected Return = sum(Return x Probability).
+    Batches candidates in chunks of PWER_CHUNK to avoid token-limit failures.
+    After the AI responds, Python verifies and recalculates every PWER figure.
+    """
+    if not all_candidates:
+        return {}
+
+    n = len(all_candidates)
+    log_and_print(f"{YLW}[PWER] Scoring {n} candidates in chunks of {PWER_CHUNK}...{RST}")
+
+    tickers     = list(all_candidates.keys())
+    all_scores: dict = {}
+
+    for i in range(0, len(tickers), PWER_CHUNK):
+        chunk_t = tickers[i:i + PWER_CHUNK]
+        chunk   = {t: all_candidates[t] for t in chunk_t}
+
+        prompt = (
+            "You are a top-tier equity research analyst.\n"
+            "MACRO REGIME: " + regime.get("regime", "BULL") + "\n\n"
+            "Assign realistic 12-month scenarios for each stock below.\n"
+            "Use specific numbers. Probabilities MUST sum to 1.0 per stock.\n\n"
+            "CANDIDATES:\n" + json.dumps(chunk, indent=2) + "\n\n"
+            "Output ONLY valid JSON (no markdown fences):\n" +
+            _PWER_FORMAT
+        )
+
+        try:
+            raw  = _call_gemini(prompt, temperature=0.10, thinking_level="high")
+            raw  = _strip_fences(raw)
+            data = json.loads(raw)
+            for s in data.get("pwer_scores", []):
+                t = s.get("ticker", "")
+                if t:
+                    all_scores[t] = _verify_pwer(s)
+        except Exception as e:
+            log_and_print(f"{RED}[PWER chunk {i//PWER_CHUNK+1} error] {e}{RST}")
+
+        if i + PWER_CHUNK < len(tickers):
+            time.sleep(1.5)
+
+    log_and_print(f"{GRN}[PWER] Scored {len(all_scores)}/{n} candidates.{RST}")
+    return all_scores
+
+
+# ============================================================
+# 10. POSITION MONITOR  (bucket-specific rules)
+# ============================================================
+def evaluate_open_positions(portfolio: dict, v_candidates: dict) -> tuple:
+    """
+    Hard stop rules evaluated HERE in Python — mandatory exits never reach the AI.
+
+    BUCKET G:
+      - Trailing stop -20% from peak       → MANDATORY_SELL
+      - Revenue growth <= 0                → MANDATORY_SELL (thesis broken)
+      - At -13% from peak                  → TRIM_50 warning
+
+    BUCKET V:
+      - Price reaches intrinsic value      → TAKE_PROFIT (mandatory)
+      - Trailing stop -15% from peak       → MANDATORY_SELL
+      - At -10% from peak                  → TRIM_50 warning
+
+    BUCKET D:
+      - Dividend cut detected              → MANDATORY_SELL
+      - Payout ratio > 85%                 → REVIEW warning
+      - Trailing stop -10% from peak       → MANDATORY_SELL
+
+    ALL BUCKETS:
+      - Pre-earnings AND PnL >= 35%        → TRIM_25_PRE_EARNINGS
+        (profit protection only — not triggered when flat / small gain)
+      - Age < MIN_HOLD_DAYS                → adds HOLD note to status
+        (does NOT apply to mandatory exits)
+    """
+    risk_matrix:     dict = {}
+    mandatory_exits: list = []
+    positions_value       = 0.0
+    temp_prices:     dict = {}
+
+    log_and_print(f"{YLW}[Monitor] Evaluating positions (bucket-specific rules)...{RST}")
+
+    # ── 1. fetch current prices ──────────────────────────────────────
+    for pk, pos in portfolio.get("positions", {}).items():
+        ticker = pk.split("_")[0]
+        try:
+            cp = float(yf.Ticker(ticker).history(period="5d")["Close"].iloc[-1])
+        except Exception:
+            cp = pos["entry_price"]
+        temp_prices[pk]  = cp
+        positions_value += pos["shares"] * cp
 
     total_nav = portfolio["cash_balance"] + positions_value
-    
-    for pos_key, pos_data in portfolio.get("positions", {}).items():
-        ticker = pos_key.split('_')[0]
-        current_price = temp_prices[pos_key]
-        current_weight = (pos_data["shares"] * current_price) / total_nav
-        pnl_pct = ((current_price - pos_data["entry_price"]) / pos_data["entry_price"]) * 100
-        
+
+    # ── 2. evaluate each position ────────────────────────────────────
+    for pk, pos in portfolio.get("positions", {}).items():
+        ticker = pk.split("_")[0]
+        bucket = _normalize_bucket(pos.get("strategy_bucket", BUCKET_G))
+        cp     = temp_prices.get(pk, pos["entry_price"])
+        ep     = pos["entry_price"]
+        pnl    = ((cp - ep) / ep) * 100 if ep > 0 else 0
+        wt     = (pos["shares"] * cp) / total_nav if total_nav > 0 else 0
+
+        # Update high-watermark
+        hwm = float(pos.get("high_watermark", ep))
+        if cp > hwm:
+            hwm = cp
+        portfolio["positions"][pk]["high_watermark"] = hwm
+        dd = ((hwm - cp) / hwm) * 100 if hwm > 0 else 0
+
+        # Position age
         try:
-            ticker_obj = yf.Ticker(ticker)
-            
-            # Daily Technicals
-            hist_d = ticker_obj.history(period="250d")
-            closes = hist_d['Close']
-            sma_50 = float(closes.iloc[-50:].mean())
-            sma_200 = float(closes.iloc[-200:].mean())
-            mom_60d = ((current_price - float(closes.iloc[-60])) / float(closes.iloc[-60])) * 100
-            
-            # Fundamentals
-            info = ticker_obj.info
-            live_rev_growth = info.get('revenueGrowth', 0) or 0
-            
-            # Weekly Technicals (200-Week EMA & MACD)
-            hist_w = ticker_obj.history(period="5y", interval="1wk")
-            w_closes = hist_w['Close'].dropna()
-            
-            ema_200_w = w_closes.ewm(span=200, adjust=False).mean()
-            current_w_ema200 = float(ema_200_w.iloc[-1])
-            
-            # MACD Calculation
-            ema_12 = w_closes.ewm(span=12, adjust=False).mean()
-            ema_26 = w_closes.ewm(span=26, adjust=False).mean()
-            macd_line = ema_12 - ema_26
-            signal_line = macd_line.ewm(span=9, adjust=False).mean()
-            macd_hist = macd_line - signal_line
-            
-            current_hist = macd_hist.iloc[-1]
-            prev_hist = macd_hist.iloc[-2]
-            
-            # Evaluate Exit Signals
-            risk_status = "HEALTHY RUNNER: Structural momentum intact. Do not touch."
-            
-            # 1. Emergency 200-Week Breakdown Check (10%+ drop)
-            if current_price < (current_w_ema200 * 0.90):
-                if current_hist < prev_hist:
-                    risk_status = "CRITICAL WEEKLY BREAKDOWN: Price >10% below 200W EMA & MACD momentum worsening. EMERGENCY SELL."
-                else:
-                    risk_status = "DEEP DRAWDOWN WITH BULLISH DIVERGENCE: Price >10% below 200W EMA, but MACD histogram is rising. HOLD."
-            
-            # 2. Standard Daily Rules
-            elif current_price < sma_200 and current_price >= (current_w_ema200 * 0.90):
-                risk_status = "STRUCTURAL CAUTION: Price below 200-day SMA, but holding above extreme weekly breakdown levels. Potential Trim."
-            elif current_price < sma_50 and mom_60d < -12:
-                risk_status = "TAILWINDS FADING: Asset experiencing severe intermediate momentum loss. Potential Trim."
-            elif live_rev_growth <= 0:
-                risk_status = "FUNDAMENTAL REVERSAL: Quarterly revenue growth has flattened or turned negative. SELL."
-                
-            risk_matrix[pos_key] = {
-                "ticker": ticker,
-                "current_weight_pct": round(current_weight * 100, 2),
-                "pnl_pct": round(pnl_pct, 2),
-                "algo_risk_status": risk_status,
-                "live_rev_growth_pct": round(live_rev_growth * 100, 2),
-                "original_buying_thesis": pos_data.get("buying_thesis", "N/A")
-            }
+            purchase_dt = datetime.strptime(
+                pos.get("purchase_date", "2020-01-01"), "%Y-%m-%d"
+            ).replace(tzinfo=ZoneInfo("America/New_York"))
+            age_days = (datetime.now(ZoneInfo("America/New_York")) - purchase_dt).days
+        except Exception:
+            age_days = 999
+
+        status   = "HEALTHY"
+        is_mand  = False
+
+        try:
+            info = yf.Ticker(ticker).info
+            rg   = float(info.get("revenueGrowth", 0) or 0)
+            pr   = float(info.get("payoutRatio",   0) or 0)
+
+            # ── Bucket G rules ────────────────────────────────────────
+            if bucket == BUCKET_G:
+                if dd >= TRAIL_G:
+                    status  = (f"MANDATORY_SELL: G trailing stop "
+                               f"(-{round(dd,1)}% from peak)")
+                    is_mand = True
+                elif rg <= 0:
+                    status  = "MANDATORY_SELL: G revenue growth turned negative"
+                    is_mand = True
+                elif dd >= TRAIL_G * 0.65:
+                    status = f"TRIM_50: G at -{round(dd,1)}% — approaching stop"
+
+            # ── Bucket V rules ────────────────────────────────────────
+            elif bucket == BUCKET_V:
+                iv = v_candidates.get(ticker, {}).get("intrinsic_value", 0)
+                if iv > 0 and cp >= iv * 0.95:
+                    status  = (f"TAKE_PROFIT: V price ${cp} reached "
+                               f"intrinsic value ${iv}")
+                    is_mand = True
+                elif dd >= TRAIL_V:
+                    status  = (f"MANDATORY_SELL: V trailing stop "
+                               f"(-{round(dd,1)}% from peak)")
+                    is_mand = True
+                elif dd >= TRAIL_V * 0.65:
+                    status = f"TRIM_50: V at -{round(dd,1)}% — approaching stop"
+
+            # ── Bucket D rules ────────────────────────────────────────
+            elif bucket == BUCKET_D:
+                try:
+                    dh = yf.Ticker(ticker).dividends
+                    if len(dh) >= 2 and dh.iloc[-1] < dh.iloc[-2] * 0.90:
+                        status  = "MANDATORY_SELL: D dividend cut — income thesis broken"
+                        is_mand = True
+                except Exception:
+                    pass
+
+                if not is_mand:
+                    if pr > 0.85:
+                        status = "REVIEW: D payout ratio >85% — dividend at risk"
+                    elif dd >= TRAIL_D:
+                        status  = (f"MANDATORY_SELL: D trailing stop "
+                                   f"(-{round(dd,1)}% from peak)")
+                        is_mand = True
+
+            # ── Pre-earnings profit protection (ALL buckets) ──────────
+            # Only fires when you are up >=EARNINGS_TRIM_PNL_MIN% AND
+            # earnings are within 5 calendar days.
+            if not is_mand and pnl >= EARNINGS_TRIM_PNL_MIN:
+                try:
+                    cal = yf.Ticker(ticker).calendar
+                    dt  = None
+                    if cal is not None:
+                        if hasattr(cal, "index") and "Earnings Date" in cal.index:
+                            dt = cal.loc["Earnings Date"].iloc[0]
+                        elif isinstance(cal, dict) and "Earnings Date" in cal:
+                            raw_dt = cal["Earnings Date"]
+                            dt = raw_dt[0] if isinstance(raw_dt, list) else raw_dt
+                    if dt is not None and pd.notna(dt):
+                        days_to_earn = (pd.Timestamp(dt) - pd.Timestamp.now()).days
+                        if 0 <= days_to_earn <= 5:
+                            status = (f"TRIM_25_PRE_EARNINGS: up {round(pnl,1)}% "
+                                      f"— trim 25% to protect gains before earnings")
+                except Exception:
+                    pass
+
+            # ── Minimum holding period note (discretionary only) ──────
+            if not is_mand and age_days < MIN_HOLD_DAYS:
+                status = status + f" [HOLD: {age_days}/{MIN_HOLD_DAYS}d min]"
+
         except Exception as e:
-            log_and_print(f"Warning: Failed to evaluate {ticker}. {e}")
-            continue
-            
-    return risk_matrix, total_nav
+            log_and_print(f"Warning monitor {ticker}: {e}")
+            status = "DATA_UNAVAILABLE"
 
-# ==========================================
-# 5. EXECUTION BRAIN & TRADE LOGIC
-# ==========================================
-def consolidate_decisions(decisions):
-    consolidated = {}
-    for d in decisions:
-        ticker = d.get("ticker", "").upper()
-        action = d.get("action", "").upper()
-        bucket = d.get("strategy_bucket", "MACRO_SWING").upper()
-        
-        if not ticker or action == "HOLD":
-            continue
-            
-        if action == "BUY":
-            unique_key = f"{ticker}_BUY_{bucket}"
-            if unique_key not in consolidated:
-                consolidated[unique_key] = d
-            else:
-                consolidated[unique_key]["allocation_amount"] = float(consolidated[unique_key].get("allocation_amount", 0)) + float(d.get("allocation_amount", 0))
-        else:
-            unique_key = f"{ticker}_{action}_{bucket}_{len(consolidated)}"
-            consolidated[unique_key] = d
-                
-    return list(consolidated.values())
+        if is_mand:
+            mandatory_exits.append({
+                "pos_key":       pk,
+                "ticker":        ticker,
+                "bucket":        bucket,
+                "status":        status,
+                "current_price": cp,
+            })
 
-def query_gemini_brain(buy_candidates, portfolio, risk_matrix, total_nav, is_correction):
+        risk_matrix[pk] = {
+            "ticker":            ticker,
+            "bucket":            bucket,
+            "current_price":     round(cp, 2),
+            "current_value":     round(pos["shares"] * cp, 2),
+            "weight_pct":        round(wt * 100, 2),
+            "pnl_pct":           round(pnl, 2),
+            "dd_from_peak_pct":  round(dd, 2),
+            "age_days":          age_days,
+            "status":            status,
+            "is_mandatory_exit": is_mand,
+        }
+
+    # Save updated high-watermarks to disk
+    save_portfolio(portfolio)
+    return risk_matrix, total_nav, mandatory_exits
+
+
+# ============================================================
+# 11. OPPORTUNITY COST ENGINE
+# ============================================================
+def run_opportunity_cost_engine(portfolio: dict, pwer_scores: dict,
+                                risk_matrix: dict) -> list:
     """
-    Advanced Institutional AI Engine. 
-    Outputs explicit transaction sizing parameters for BUYS, SELLS, and TRIMS.
+    If an existing position's PWER is more than 15% below a replacement
+    candidate's PWER, flag it as a swap opportunity.
+    E.g. TMO at +5.3% PWER vs NVDA at +37.7% PWER — swap.
     """
-    
-    system_prompt = f"""
-    You are an elite Institutional Portfolio Manager executing a Top-Down Macro framework. 
+    swaps: list = []
+    if not pwer_scores or not portfolio.get("positions"):
+        return swaps
 
-    PORTFOLIO OPERATIONAL STATUS:
-    * Current Estimated Portfolio NAV: ${round(total_nav, 2)}
-    * Available Execution Cash: ${round(portfolio["cash_balance"], 2)}
-    * BROADER MARKET CORRECTION ACTIVE: {is_correction}
-    
-    Active Positions Risk Registry: {json.dumps(risk_matrix)}
-    Top Quant-Filtered Growth Opportunities (Raw Data): {json.dumps(buy_candidates)}
+    for pk, pos in portfolio["positions"].items():
+        ticker = pk.split("_")[0]
+        ep = pwer_scores.get(ticker, {}).get("pwer_pct", None)
+        if ep is None:
+            continue
 
-    INSTITUTIONAL DIRECTIVES & TRADING PROTOCOLS:
-    1. PRICE ACTION & DRAWDOWN EVALUATION: Treat severe technical drawdowns in secular trends as high-conviction asymmetric buy opportunities where macro risk is already priced in.
-    2. HISTORICAL MULTIPLE COMPRESSION: Cross-reference absolute metrics with 5-year historical medians to avoid value traps.
-    3. EXACT TRANSACTION SIZING: 
-       * For a BUY: Allocate an explicit dollar amount (typically ~10% of total NAV).
-       * For a TRIM: Specify the exact dollar amount to liquidate AND the percentage of the current position being cut (e.g., trim 25% or 50% of the holding).
-       * For a SELL: Liquidation value must equal 100% of the current asset value.
-
-    INSTRUCTIONS:
-    First, write a deep-dive "MARKET COMMENTARY" detailing your macro synthesis.
-    Second, output the execution array in a strict JSON structure under the heading "JSON_DATA:".
-
-    Output your response EXACTLY in this format:
-
-    MARKET COMMENTARY:
-    [Your institutional macro and price action analysis paragraph.]
-    
-    JSON_DATA:
-    {{
-        "trades": [
-            {{
-              "action": "BUY" or "SELL" or "TRIM" or "HOLD",
-              "ticker": "TICKER",
-              "strategy_bucket": "LONG_TERM_CORE" or "MACRO_SWING",
-              "transaction_value_usd": 5000, 
-              "position_action_percentage": 50,
-              "analysis_display": "Technical/Fundamental rationale detailing historical multiple compression and drawdown state."
-            }}
+        better = [
+            (t, s) for t, s in pwer_scores.items()
+            if s.get("pwer_pct", 0) > ep + 15
+            and not any(k.startswith(t) for k in portfolio["positions"])
         ]
-    }}
+        better.sort(key=lambda x: x[1]["pwer_pct"], reverse=True)
+
+        if better:
+            bt, bs = better[0]
+            swaps.append({
+                "existing":           ticker,
+                "existing_pk":        pk,
+                "existing_pwer":      ep,
+                "replacement":        bt,
+                "replacement_pwer":   bs["pwer_pct"],
+                "pwer_improvement":   round(bs["pwer_pct"] - ep, 1),
+                "replacement_bucket": bs.get("bucket", BUCKET_G),
+                "catalyst":           bs.get("key_catalyst", ""),
+            })
+
+    if swaps:
+        log_and_print(f"{YLW}[OpCost] {len(swaps)} swap candidates.{RST}")
+    return swaps
+
+
+# ============================================================
+# 12. BUCKET BALANCE CHECK
+# ============================================================
+def check_portfolio_balance(risk_matrix: dict, total_nav: float) -> tuple:
     """
-    
-    log_and_print(f"{YELLOW}[🧠 Gemini] Submitting data to Macro & Sizing Engine...{RESET}")
-    
-    try:
-        response = ai_client.models.generate_content(
-            model='gemini-3.1-pro-preview',
-            contents=system_prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.15,
-                thinking_config=types.ThinkingConfig(thinking_level="high")
+    Compares current bucket weights against targets.
+    Flags buckets that have drifted >20% above their target.
+    """
+    if not risk_matrix or total_nav <= 0:
+        return {}, []
+
+    vals = {BUCKET_G: 0.0, BUCKET_V: 0.0, BUCKET_D: 0.0}
+    for data in risk_matrix.values():
+        b = data.get("bucket", BUCKET_G)
+        vals[b] = vals.get(b, 0.0) + data.get("current_value", 0.0)
+
+    targets = {BUCKET_G: MAX_G, BUCKET_V: MAX_V, BUCKET_D: MAX_D}
+    actual  = {b: round(v / total_nav * 100, 1) for b, v in vals.items()}
+    warnings_list: list = []
+
+    for b, pct in actual.items():
+        target_pct = targets[b] * 100
+        if pct > target_pct * 1.20:
+            warnings_list.append(
+                f"{b} OVERWEIGHT: {pct}% actual vs {target_pct}% target"
             )
-        )
-        
-        raw_text = response.text.strip()
-        
-        commentary = ""
-        if "JSON_DATA:" in raw_text:
-            parts = raw_text.split("JSON_DATA:")
-            commentary = parts[0].replace("MARKET COMMENTARY:", "").strip()
-            json_str = parts[1].strip()
-        else:
-            json_str = raw_text
-        
-        if json_str.startswith("```json"):
-            json_str = json_str.replace("
-```json\n", "").replace("```", "").strip()
-        elif json_str.startswith("```"):
-            json_str = json_str.replace("
-```\n", "").replace("```", "").strip()
-            
-        data = json.loads(json_str)
-        trades = data.get("trades", data)
-        
-        if commentary:
-            log_and_print(f"{GREEN}[🧠 Gemini] Price action scan complete.{RESET}")
-            send_notification(f"📊 *Institutional Macro & Technical Report:*\n\n{commentary}")
-        
-        return consolidate_decisions(trades)
-        
+
+    return actual, warnings_list
+
+
+# ============================================================
+# 13. MULTI-AGENT AI PIPELINE
+# ============================================================
+
+# Macro Agent prompt output-format constant
+_MACRO_FORMAT = (
+    '{"positioning_bias":"AGGRESSIVE|NEUTRAL|DEFENSIVE",'
+    '"strongest_tailwinds":["AI_SEMICONDUCTORS"],'
+    '"sectors_to_avoid":["Real Estate"],'
+    '"value_buying_env":"YES|NO",'
+    '"increase_dividend_alloc":"YES|NO"}'
+)
+
+# Constructor Agent prompt output-format constant
+_ORDER_FORMAT = (
+    '{"orders":['
+    '{"action":"BUY|SELL","ticker":"X",'
+    '"strategy_bucket":"GROWTH|VALUE|DIVIDEND",'
+    '"transaction_value_usd":5000,'
+    '"analysis_display":"rationale — cite PWER score"}'
+    "]}"
+)
+
+
+def query_macro_agent(regime: dict, risk_matrix: dict,
+                      active_tailwinds: dict) -> tuple:
+    """AGENT 1 — Macro brief and sector rotation directives."""
+    prompt = (
+        "You are the CIO of a top global macro hedge fund "
+        "running a GVD portfolio (Growth, Value, Dividend).\n\n"
+        "REGIME:\n" + json.dumps(regime, indent=2) + "\n\n"
+        "ACTIVE TAILWINDS:\n" + json.dumps(active_tailwinds, indent=2) + "\n\n"
+        "PORTFOLIO RISK MATRIX:\n" + json.dumps(risk_matrix, indent=2) + "\n\n"
+        "Write a 3-paragraph macro brief covering: regime characterisation, "
+        "sector rotation, and key tail risks for the next 30 days.\n\n"
+        "Then output your directives under exactly this heading:\n"
+        "JSON_DIRECTIVES:\n" + _MACRO_FORMAT
+    )
+    try:
+        raw  = _call_gemini(prompt, temperature=0.10, thinking_level="high")
+        body = raw.split("JSON_DIRECTIVES:")[0].strip() if "JSON_DIRECTIVES:" in raw else raw
+        jstr = (_strip_fences(raw.split("JSON_DIRECTIVES:")[1])
+                if "JSON_DIRECTIVES:" in raw else "{}")
+        d = json.loads(jstr)
+        log_and_print(f"{CYN}[Macro] Bias: {d.get('positioning_bias')}{RST}")
+        send_notification("*MACRO BRIEF*\n\n" + body[:800])
+        return d, body
     except Exception as e:
-        log_and_print(f"{RED}[❌ System] GenAI Strategy query failed: {e}{RESET}")
+        log_and_print(f"{RED}[Macro Agent error] {e}{RST}")
+        return {
+            "positioning_bias": "NEUTRAL",
+            "sectors_to_avoid": [],
+            "value_buying_env": "YES",
+            "increase_dividend_alloc": "NO",
+        }, ""
+
+
+def query_portfolio_constructor(
+    g: dict, v: dict, d: dict,
+    pwer: dict, macro: dict, regime: dict,
+    portfolio: dict, nav: float,
+    mines: dict, swaps: list,
+    balance_warnings: list,
+) -> list:
+    """
+    AGENT 2 — Selects new buys and opportunity-cost swaps.
+    Cannot override mandatory exits (those execute in Python).
+    Every buy order must cite the PWER score in analysis_display.
+    """
+    avoid  = set(macro.get("sectors_to_avoid", []))
+    bias   = macro.get("positioning_bias", "NEUTRAL")
+
+    def filt(cands):
+        return {k: c for k, c in cands.items()
+                if k not in mines and c.get("sector", "") not in avoid}
+
+    sg = filt(g) if regime.get("new_growth_buys_allowed") else {}
+    sv = filt(v)
+    sd = filt(d)
+
+    def add_pwer(cands):
+        for t in cands:
+            if t in pwer:
+                cands[t]["pwer_pct"]  = pwer[t].get("pwer_pct", 0)
+                cands[t]["catalyst"]  = pwer[t].get("key_catalyst", "")
+                cands[t]["risk"]      = pwer[t].get("key_risk", "")
+                cands[t]["conviction"] = pwer[t].get("conviction", "MEDIUM")
+            atr_val = _atr_size(
+                t, nav,
+                regime["max_pos_pct"].get(_normalize_bucket(
+                    cands[t].get("bucket", BUCKET_G)), 0.10)
+            )
+            cands[t]["atr_recommended_size_usd"] = round(atr_val, 2)
+        return cands
+
+    sg = add_pwer(sg); sv = add_pwer(sv); sd = add_pwer(sd)
+    slots = max(0, TARGET_POSITIONS - len(portfolio.get("positions", {})))
+
+    prompt = (
+        "You are a Portfolio Constructor managing a GVD fund.\n"
+        "Allocation targets: Growth <=50% NAV | Value <=35% | Dividend <=15%.\n"
+        "Maximum 15 total positions. Every slot is earned by PWER ranking.\n\n"
+        "MACRO BIAS: " + bias + " | REGIME: " + regime.get("regime","BULL") + "\n"
+        "PORTFOLIO NAV: $" + str(round(nav, 2)) + "\n"
+        "AVAILABLE CASH: $" + str(round(portfolio["cash_balance"], 2)) + "\n"
+        "OPEN SLOTS: " + str(slots) + "\n"
+        "EXISTING POSITIONS: " + json.dumps(list(portfolio.get("positions", {}).keys())) + "\n"
+        "EARNINGS BLOCKED: " + json.dumps(list(mines.keys())) + "\n"
+        "BUCKET BALANCE WARNINGS: " + json.dumps(balance_warnings) + "\n\n"
+        "GROWTH CANDIDATES (use atr_recommended_size_usd for sizing):\n"
+        + json.dumps(sg, indent=2) + "\n\n"
+        "VALUE CANDIDATES (intrinsic value discounts):\n"
+        + json.dumps(sv, indent=2) + "\n\n"
+        "DIVIDEND CANDIDATES (portfolio stability):\n"
+        + json.dumps(sd, indent=2) + "\n\n"
+        "OPPORTUNITY COST SWAPS (>15% PWER improvement available):\n"
+        + json.dumps(swaps, indent=2) + "\n\n"
+        "Rules:\n"
+        "1. Select 2-4 buys across G/V/D. In BEAR regime: no G, lean V+D.\n"
+        "2. For confirmed swaps: issue SELL for old + BUY for replacement.\n"
+        "3. ALWAYS cite the PWER score in analysis_display.\n"
+        "4. Use atr_recommended_size_usd as default position size.\n"
+        "5. Do NOT suggest selling positions flagged as HOLD (min age).\n\n"
+        "Output ONLY valid JSON (no markdown fences):\n" + _ORDER_FORMAT
+    )
+    try:
+        raw  = _call_gemini(prompt, temperature=0.12, thinking_level="medium")
+        raw  = _strip_fences(raw)
+        data = json.loads(raw)
+        return data.get("orders", [])
+    except Exception as e:
+        log_and_print(f"{RED}[Constructor error] {e}{RST}")
         return []
 
-def execute_trades(agent_decisions, portfolio, buy_candidates, risk_matrix, total_nav, is_correction):
-    if not agent_decisions:
-        log_and_print(f"{YELLOW}[⚠] No strategic trades ordered today.{RESET}")
-        return
-    
-    # 4% safe cash floor during normal markets, 0.5% during corrections
-    CASH_RESERVE_FLOOR = total_nav * 0.005 if is_correction else total_nav * 0.04
-    max_allocation = round(total_nav * 0.12, 2)
-        
-    for decision in agent_decisions:
-        action = decision.get("action", "").upper()
-        ticker = decision.get("ticker", "").upper()
-        # Extract new strict sizing metrics from the AI (fallback to old allocation_amount if needed)
-        value = float(decision.get("transaction_value_usd", decision.get("allocation_amount", 0)))
-        pct_to_trim = float(decision.get("position_action_percentage", 0))
-        bucket = decision.get("strategy_bucket", "MACRO_SWING").upper()
-        rationale = decision.get("analysis_display", "")
-        
-        if action == "HOLD": continue
-            
-        elif action in ["SELL", "TRIM"]:
-            target_key = f"{ticker}_{bucket}"
-            keys_to_process = [target_key] if target_key in portfolio["positions"] else [pk for pk in portfolio["positions"] if pk.startswith(ticker)]
-            
-            for pk in list(keys_to_process):
-                pos = portfolio["positions"][pk]
-                current_price = risk_matrix.get(pk, {}).get("current_price", pos["entry_price"])
-                
-                if action == "SELL":
-                    total_reclaimed = pos["shares"] * current_price
-                    portfolio["cash_balance"] += total_reclaimed
-                    del portfolio["positions"][pk]
-                    
-                    msg = f"🔴 *TOTAL POSITION LIQUIDATION: {ticker}*\n\nAction: Selling 100% of holdings\nTotal Capital Reclaimed: ${round(total_reclaimed, 2)}\nReasoning: {rationale}"
-                    log_and_print(f"{RED}{msg}{RESET}"); send_notification(msg)
-                    
-                elif action == "TRIM":
-                    # Determine trim amount via explicit AI percentage, or fallback to AI dollar value
-                    if pct_to_trim > 0:
-                        trim_amount = (pos["shares"] * current_price) * (pct_to_trim / 100.0)
-                    else:
-                        trim_amount = min(value, pos["shares"] * current_price)
-                        pct_to_trim = (trim_amount / (pos["shares"] * current_price)) * 100 if pos["shares"] > 0 else 0
-                        
-                    portfolio["cash_balance"] += trim_amount
-                    pos["shares"] -= (trim_amount / current_price)
-                    pos["allocated_capital"] = pos["shares"] * pos["entry_price"]
-                    
-                    msg = f"🟠 *PORTFOLIO POSITION TRIM: {ticker}*\n\nAction: Liquidating {round(pct_to_trim, 1)}% of position\nCash Value Reclaimed: ${round(trim_amount, 2)}\nReasoning: {rationale}"
-                    log_and_print(f"{YELLOW}{msg}{RESET}"); send_notification(msg)
-            
-        elif action == "BUY" and ticker in buy_candidates:
-            if (portfolio["cash_balance"] - value) < CASH_RESERVE_FLOOR:
-                value = max(0.0, portfolio["cash_balance"] - CASH_RESERVE_FLOOR)
-                
-            current_exposure = sum(p["allocated_capital"] for pk, p in portfolio["positions"].items() if pk.startswith(ticker))
-            if current_exposure + value > max_allocation:
-                value = max(0.0, max_allocation - current_exposure)
-                
-            if value <= 500: continue
-                
-            current_price = buy_candidates[ticker]["price"]
-            shares = value / current_price
-            portfolio["cash_balance"] -= value
-            pos_key = f"{ticker}_{bucket}"
-            
-            if pos_key in portfolio["positions"]:
-                old_shares = portfolio["positions"][pos_key]["shares"]
-                old_capital = portfolio["positions"][pos_key]["allocated_capital"]
-                portfolio["positions"][pos_key]["shares"] = old_shares + shares
-                portfolio["positions"][pos_key]["allocated_capital"] = old_capital + value
-                portfolio["positions"][pos_key]["entry_price"] = (old_capital + value) / (old_shares + shares)
-            else:
-                portfolio["positions"][pos_key] = {
-                    "entry_price": current_price,
-                    "shares": shares,
-                    "allocated_capital": value,
-                    "strategy_bucket": bucket,
-                    "purchase_date": datetime.now(ZoneInfo("America/New_York")).strftime('%Y-%m-%d'),
-                    "buying_thesis": rationale
-                }
-                
-            msg = f"🟢 *STRATEGIC ACQUISITION: {ticker}*\n\nSetup: {buy_candidates[ticker].get('setup_type', 'Standard')}\nAllocated: ${round(value, 2)} @ ${round(current_price, 2)}\nThesis: {rationale}"
-            log_and_print(f"{GREEN}{msg}{RESET}"); send_notification(msg)
+
+# ============================================================
+# 14. EXECUTION ENGINE
+# ============================================================
+def execute_mandatory_exits(mandatory_exits: list, portfolio: dict,
+                            risk_matrix: dict, total_nav: float) -> None:
+    """Hard stop exits — Python-enforced, zero AI discretion."""
+    for item in mandatory_exits:
+        pk     = item["pos_key"]
+        ticker = item["ticker"]
+        bucket = item.get("bucket", "?")
+        cp     = item["current_price"]
+        status = item["status"]
+
+        if pk not in portfolio["positions"]:
+            continue
+
+        pos = portfolio["positions"][pk]
+        rec = pos["shares"] * cp
+        portfolio["cash_balance"] += rec
+        del portfolio["positions"][pk]
+
+        msg = (f"MANDATORY EXIT [{bucket}]: {ticker}\n"
+               f"Rule: {status}\n"
+               f"Reclaimed: ${round(rec, 2)}")
+        log_and_print(f"{RED}{msg}{RST}")
+        send_notification(msg)
 
     save_portfolio(portfolio)
 
-    def check_and_send_weekly_summary(portfolio, risk_matrix, total_nav):
-    """
-    Evaluates system time. If running a weekend close or forced flag,
-    aggregates and transmits portfolio total value, cash position, and holding valuations.
-    """
-    import sys
-    
-    # Triggers automatically on Fridays (weekday 4), or via a custom command-line flag
-    if "--weekly-summary" in sys.argv or datetime.now(ZoneInfo("America/New_York")).weekday() == 4:
-        log_and_print(f"{YELLOW}[📊 System] Generating End-of-Week Portfolio Summary...{RESET}")
-        
-        cash = portfolio.get("cash_balance", 0)
-        total_holdings_value = total_nav - cash
-        
-        holdings_breakdown = ""
-        for ticker, details in risk_matrix.items():
-            current_val = details.get("current_value", 0)
-            weight = details.get("current_weight_pct", 0)
-            
-            if current_val > 0:
-                holdings_breakdown += f"  • *{ticker.split('_')[0]}*: ${round(current_val, 2)} ({round(weight, 1)}%)\n"
-        
-        if not holdings_breakdown:
-            holdings_breakdown = "  • No active stock positions (100% Cash)\n"
-            
-        summary_message = (
-            "🗓️ *END-OF-WEEK PORTFOLIO VALUATION REPORT*\n"
-            "===================================\n\n"
-            f"💰 *Total Net Asset Value (NAV):* ${round(total_nav, 2)}\n"
-            f"💵 *Available Cash Position:* ${round(cash, 2)}\n"
-            f"📈 *Total Stock Equity Value:* ${round(total_holdings_value, 2)}\n\n"
-            "📦 *Current Asset Allocations:*\n"
-            f"{holdings_breakdown}\n"
-            "===================================\n"
-            "🚨 _System status: Operational. Next risk matrix scan scheduled for Monday open._"
+
+def execute_agent_orders(orders: list, portfolio: dict, all_candidates: dict,
+                         risk_matrix: dict, total_nav: float,
+                         regime: dict) -> None:
+    """Execute agent BUY and SELL orders with ATR-aware position sizing."""
+    if not orders:
+        log_and_print(f"{YLW}[Exec] No agent orders.{RST}")
+        return
+
+    FLOOR = total_nav * regime.get("cash_floor_pct", 0.04)
+
+    for o in orders:
+        action = o.get("action", "").upper()
+        ticker = o.get("ticker", "").upper()
+        bucket = _normalize_bucket(o.get("strategy_bucket", BUCKET_G))
+        val    = float(o.get("transaction_value_usd", 0))
+        rat    = o.get("analysis_display", "")
+
+        if action == "SELL":
+            keys = [pk for pk in portfolio["positions"] if pk.startswith(ticker)]
+            for pk in list(keys):
+                pos = portfolio["positions"].get(pk)
+                if not pos:
+                    continue
+                # Respect minimum holding period for discretionary sells
+                try:
+                    purchase_dt = datetime.strptime(
+                        pos.get("purchase_date", "2020-01-01"), "%Y-%m-%d"
+                    ).replace(tzinfo=ZoneInfo("America/New_York"))
+                    age_days = (datetime.now(ZoneInfo("America/New_York"))
+                                - purchase_dt).days
+                    if age_days < MIN_HOLD_DAYS:
+                        log_and_print(
+                            f"{YLW}[Exec] Skip sell {ticker}: "
+                            f"only {age_days}d old (min {MIN_HOLD_DAYS}d){RST}")
+                        continue
+                except Exception:
+                    pass
+
+                cp  = risk_matrix.get(pk, {}).get("current_price", pos["entry_price"])
+                rec = pos["shares"] * cp
+                portfolio["cash_balance"] += rec
+                del portfolio["positions"][pk]
+                msg = (f"AGENT SELL [{bucket}]: {ticker} | "
+                       f"${round(rec, 2)} reclaimed | {rat}")
+                log_and_print(f"{RED}{msg}{RST}")
+                send_notification(msg)
+
+        elif action == "BUY":
+            cand = all_candidates.get(ticker)
+            if not cand:
+                log_and_print(f"{YLW}[Exec] {ticker} not in screened candidates — skip.{RST}")
+                continue
+
+            avail = portfolio["cash_balance"] - FLOOR
+            if avail <= 0:
+                log_and_print(f"{YLW}[Exec] Cash floor reached — skip {ticker}.{RST}")
+                continue
+
+            val = min(val, avail)
+            mp  = total_nav * regime["max_pos_pct"].get(bucket, 0.10)
+            exist = sum(p["allocated_capital"]
+                        for pk, p in portfolio["positions"].items()
+                        if pk.startswith(ticker))
+            val = min(val, max(0.0, mp - exist))
+
+            if val < 500:
+                log_and_print(f"{YLW}[Exec] {ticker} size ${round(val,2)} too small — skip.{RST}")
+                continue
+
+            cp  = cand.get("price", 0)
+            if cp <= 0:
+                continue
+
+            sh     = val / cp
+            pos_key = f"{ticker}_{bucket}"
+            portfolio["cash_balance"] -= val
+
+            if pos_key in portfolio["positions"]:
+                old = portfolio["positions"][pos_key]
+                nc  = old["allocated_capital"] + val
+                ns  = old["shares"] + sh
+                portfolio["positions"][pos_key].update({
+                    "shares":            ns,
+                    "allocated_capital": nc,
+                    "entry_price":       nc / ns,
+                    "high_watermark":    max(float(old.get("high_watermark", 0)), cp),
+                })
+            else:
+                portfolio["positions"][pos_key] = {
+                    "entry_price":       cp,
+                    "shares":            sh,
+                    "allocated_capital": val,
+                    "strategy_bucket":   bucket,
+                    "purchase_date":     datetime.now(
+                        ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
+                    "buying_thesis":     rat,
+                    "high_watermark":    cp,
+                }
+
+            pwer_str = (f" | PWER:{cand.get('pwer_pct','?')}%"
+                        if "pwer_pct" in cand else "")
+            msg = (f"BUY [{bucket}]: {ticker} | "
+                   f"${round(val,2)} @ ${round(cp,2)}{pwer_str}\n"
+                   f"Tags: {cand.get('tags','')}\n{rat}")
+            log_and_print(f"{GRN}{msg}{RST}")
+            send_notification(msg)
+
+    save_portfolio(portfolio)
+
+
+# ============================================================
+# 15. PERFORMANCE ATTRIBUTION
+# ============================================================
+def calculate_performance_metrics(portfolio: dict,
+                                  benchmark: str = "SPY") -> dict:
+    """Sharpe, Sortino, Alpha (Jensen), Beta, Max DD, Calmar — vs SPY."""
+    if not portfolio.get("positions"):
+        return {}
+    try:
+        start = min(
+            pd.Timestamp(p.get("purchase_date", "2024-01-01"))
+            for p in portfolio["positions"].values()
         )
-        
-        send_notification(summary_message)
-        log_and_print(f"{GREEN}[📊 System] Weekly report delivered successfully.{RESET}")
+        tickers = list(set(pk.split("_")[0] for pk in portfolio["positions"]))
+        if not tickers:
+            return {}
 
-# ==========================================
-# 6. MAIN EXECUTION LOOP
-# ==========================================
+        px = yf.download(
+            tickers + [benchmark], start=start,
+            auto_adjust=True, progress=False
+        )["Close"]
+
+        if isinstance(px, pd.Series):
+            px = px.to_frame(name=tickers[0])
+        if benchmark not in px.columns:
+            return {}
+
+        bench   = px[benchmark].pct_change().dropna()
+        b_total = (px[benchmark].iloc[-1] / px[benchmark].iloc[0] - 1) * 100
+
+        tc = sum(p["allocated_capital"] for p in portfolio["positions"].values())
+        if tc <= 0:
+            return {}
+
+        w: dict = {}
+        for pk, p in portfolio["positions"].items():
+            t = pk.split("_")[0]
+            w[t] = w.get(t, 0) + p["allocated_capital"] / tc
+
+        valid  = [t for t in tickers if t in px.columns]
+        pr     = pd.Series(0.0, index=px.index)
+        for t in valid:
+            if t in w:
+                pr = pr + px[t].pct_change() * w[t]
+
+        al = pd.concat([pr, bench], axis=1, join="inner").dropna()
+        al.columns = ["p", "b"]
+        if len(al) < 5:
+            return {}
+
+        RF  = 0.045;  ANN = 252
+        mu  = al["p"].mean() * ANN
+        sig = al["p"].std()  * ANN ** 0.5
+        sh  = (mu - RF) / sig if sig > 0 else 0
+
+        dn  = al["p"][al["p"] < RF / ANN]
+        sdn = dn.std() * ANN ** 0.5 if len(dn) > 0 else sig
+        so  = (mu - RF) / sdn if sdn > 0 else 0
+
+        cov  = np.cov(al["p"], al["b"])[0, 1]
+        beta = cov / al["b"].var() if al["b"].var() > 0 else 1.0
+        mu_b = al["b"].mean() * ANN
+        alph = mu - (RF + beta * (mu_b - RF))
+
+        cum  = (1 + al["p"]).cumprod()
+        mdd  = float(((cum - cum.cummax()) / cum.cummax()).min()) * 100
+        tot  = ((1 + al["p"]).prod() - 1) * 100
+        cal  = (mu - RF) / abs(mdd / 100) if mdd != 0 else 0
+
+        # Per-bucket breakdown
+        bkt: dict = {}
+        for pk, pos in portfolio["positions"].items():
+            t = pk.split("_")[0]; b = pos.get("strategy_bucket", "?")
+            if t in px.columns:
+                r = (px[t].iloc[-1] / px[t].iloc[0] - 1) * 100
+                bkt[b] = bkt.get(b, []) + [r]
+        bkt_avg = {b: round(float(np.mean(v)), 1) for b, v in bkt.items()}
+
+        metrics = {
+            "total_return_pct":  round(tot, 2),
+            "benchmark_pct":     round(b_total, 2),
+            "alpha_ann_pct":     round(alph * 100, 2),
+            "beta":              round(beta, 3),
+            "sharpe":            round(sh, 3),
+            "sortino":           round(so, 3),
+            "max_dd_pct":        round(mdd, 2),
+            "calmar":            round(cal, 3),
+            "ann_vol_pct":       round(sig * 100, 2),
+            "bucket_returns":    bkt_avg,
+        }
+        log_and_print(f"{GRN}[Perf] {metrics}{RST}")
+        return metrics
+
+    except Exception as e:
+        log_and_print(f"Warning: Performance calc failed: {e}")
+        return {}
+
+
+# ============================================================
+# 16. WEEKLY REPORT
+# ============================================================
+def check_and_send_weekly_summary(
+    portfolio: dict, risk_matrix: dict, total_nav: float,
+    perf: dict, bucket_pcts: dict, balance_warnings: list,
+) -> None:
+    is_fri = datetime.now(ZoneInfo("America/New_York")).weekday() == 4
+    if not is_fri and "--weekly-summary" not in sys.argv:
+        return
+
+    cash     = portfolio.get("cash_balance", 0)
+    cash_pct = cash / total_nav * 100 if total_nav > 0 else 0
+
+    bkts: dict = {BUCKET_G: [], BUCKET_V: [], BUCKET_D: []}
+    for pk, data in risk_matrix.items():
+        b   = data.get("bucket", BUCKET_G)
+        val = data.get("current_value", 0)
+        pnl = data.get("pnl_pct", 0)
+        if val > 0:
+            bkts.get(b, []).append(
+                f"  {pk.split('_')[0]}: ${round(val,2)} | PnL: {round(pnl,1)}%"
+            )
+    holdings = ""
+    for bn, lines in bkts.items():
+        alloc = bucket_pcts.get(bn, 0)
+        if lines:
+            holdings += f"\n[{bn} — {alloc}% NAV]\n" + "\n".join(lines) + "\n"
+    if not holdings:
+        holdings = "  100% Cash\n"
+
+    ps = ""
+    if perf:
+        ps = (
+            f"\nPERFORMANCE vs SPY\n"
+            f"  Return: {perf.get('total_return_pct','N/A')}%  "
+            f"SPY: {perf.get('benchmark_pct','N/A')}%\n"
+            f"  Alpha:  {perf.get('alpha_ann_pct','N/A')}%  "
+            f"Sharpe: {perf.get('sharpe','N/A')}\n"
+            f"  MaxDD:  {perf.get('max_dd_pct','N/A')}%  "
+            f"Sortino: {perf.get('sortino','N/A')}\n"
+            f"  Bucket returns: {perf.get('bucket_returns',{})}\n"
+        )
+
+    bw = ("\nBALANCE WARNINGS\n" +
+          "\n".join(f"  * {w}" for w in balance_warnings)
+          if balance_warnings else "")
+
+    msg = (
+        "GVD WEEKLY REPORT — SUPER INVESTOR PORTFOLIO\n"
+        "============================================\n"
+        f"NAV:  ${round(total_nav,2)}\n"
+        f"Cash: ${round(cash,2)} ({round(cash_pct,1)}%)\n"
+        f"{holdings}{ps}{bw}\n"
+        "============================================\n"
+        "Next scan: Monday after close"
+    )
+    send_notification(msg)
+    log_and_print(f"{GRN}[Report] Weekly GVD report delivered.{RST}")
+
+
+# ============================================================
+# 17. MAIN PIPELINE
+# ============================================================
 if __name__ == "__main__":
-    log_and_print(f"{CYAN}=================================================={RESET}")
-    log_and_print(f"{CYAN}   🚀 INITIALIZING INSTITUTIONAL GROWTH ENGINE    {RESET}")
-    log_and_print(f"{CYAN}=================================================={RESET}")
-    
-    portfolio = load_portfolio()
-    universe = get_macro_universe()
-    
-    # 1. Market Health Check
-    is_correction, current_drawdown = check_market_regime()
-    
-    # 2. Quality Screener (GARP + 200W EMA)
-    buy_setups = run_macro_screener(universe)
-    
-    # 3. Live Risk Monitor (Uncapped + Weekly MACD Divergences)
-    risk_matrix, current_nav = evaluate_open_positions(portfolio)
-    
-    # 4. AI Strategy Decision Engine
-    decisions = query_gemini_brain(buy_setups, portfolio, risk_matrix, current_nav, is_correction)
-    
-    # 5. Broker Execution
-    execute_trades(decisions, portfolio, buy_setups, risk_matrix, current_nav, is_correction)
+    log_and_print(f"{CYN}{'='*60}{RST}")
+    log_and_print(f"{CYN}   GVD PORTFOLIO SYSTEM v3.1 — INITIALIZING         {RST}")
+    log_and_print(f"{CYN}   Strategy: Growth + Value + Dividend | PWER        {RST}")
+    log_and_print(f"{CYN}   Model: {GEMINI_MODEL}                             {RST}")
+    log_and_print(f"{CYN}{'='*60}{RST}")
 
-    # ---------------------------------------------------------
-    # FINAL STEP: Check if it's Friday and send the weekly wrap-up
-    # ---------------------------------------------------------
-    check_and_send_weekly_summary(portfolio, risk_matrix, total_nav)
-    
-    log_and_print(f"{CYAN}=================================================={RESET}")
-    log_and_print(f"{CYAN}         ✅ SYSTEM OPERATION COMPLETED            {RESET}")
-    log_and_print(f"{CYAN}=================================================={RESET}")
+    portfolio = load_portfolio()
+
+    # ── Phase 1: Market Intelligence ─────────────────────────────────
+    universe                       = get_macro_universe()
+    regime                         = check_market_regime()
+    active_tailwinds, sector_map   = scan_macro_tailwinds()
+
+    # ── Phase 2: Three-Bucket Screening ──────────────────────────────
+    log_and_print(f"{CYN}[Phase 2] Running three-bucket screeners...{RST}")
+    g_cands = run_growth_screener(universe, active_tailwinds, sector_map)
+    v_cands = run_value_screener(universe)
+    d_cands = run_dividend_screener(universe)
+    all_cands = {**g_cands, **v_cands, **d_cands}
+    mines     = get_earnings_landmines(list(all_cands.keys()))
+
+    # ── Phase 3: PWER Scoring ─────────────────────────────────────────
+    # Score candidates + existing positions (needed for opportunity cost engine)
+    existing_pos_data = {
+        pk.split("_")[0]: {
+            "bucket": pos.get("strategy_bucket", ""),
+            "price":  pos.get("entry_price", 0),
+            "pnl_pct": (
+                (temp_cp := pos.get("entry_price", 1)),
+                round(0.0, 2)   # placeholder; accurate price fetched in monitor
+            )[1]
+        }
+        for pk, pos in portfolio.get("positions", {}).items()
+    }
+    pwer_input  = {**all_cands, **existing_pos_data}
+    pwer_scores = calculate_pwer_batch(pwer_input, regime)
+
+    # ── Phase 4: Monitor, Risk & Opportunity Cost ─────────────────────
+    risk_matrix, current_nav, mandatory_exits = evaluate_open_positions(
+        portfolio, v_cands)
+    portfolio = load_portfolio()   # reload after watermark saves
+
+    bucket_pcts, balance_warnings = check_portfolio_balance(risk_matrix, current_nav)
+    performance   = calculate_performance_metrics(portfolio)
+    swap_cands    = run_opportunity_cost_engine(portfolio, pwer_scores, risk_matrix)
+
+    if balance_warnings:
+        for w in balance_warnings:
+            log_and_print(f"{YLW}[Balance] {w}{RST}")
+
+    # ── Phase 5: Mandatory Hard Stops (Python — no AI) ────────────────
+    if mandatory_exits:
+        log_and_print(f"{RED}[Phase 5] Executing {len(mandatory_exits)} mandatory exits...{RST}")
+        execute_mandatory_exits(mandatory_exits, portfolio, risk_matrix, current_nav)
+        portfolio   = load_portfolio()
+        current_nav = sum(
+            pos["shares"] * pos.get("high_watermark", pos["entry_price"])
+            for pos in portfolio["positions"].values()
+        ) + portfolio["cash_balance"]
+
+    # ── Phase 6: AI Agents ────────────────────────────────────────────
+    macro_directives, _ = query_macro_agent(regime, risk_matrix, active_tailwinds)
+    agent_orders        = query_portfolio_constructor(
+        g_cands, v_cands, d_cands,
+        pwer_scores, macro_directives, regime,
+        portfolio, current_nav, mines, swap_cands, balance_warnings,
+    )
+
+    # ── Phase 7: Execute Agent Orders ─────────────────────────────────
+    execute_agent_orders(agent_orders, portfolio, all_cands,
+                         risk_matrix, current_nav, regime)
+    portfolio = load_portfolio()
+
+    # ── Phase 8: Weekly Report ─────────────────────────────────────────
+    check_and_send_weekly_summary(
+        portfolio, risk_matrix, current_nav,
+        performance, bucket_pcts, balance_warnings,
+    )
+
+    log_and_print(f"{CYN}{'='*60}{RST}")
+    log_and_print(f"{CYN}   GVD SYSTEM v3.1 CYCLE COMPLETE                   {RST}")
+    log_and_print(f"{CYN}{'='*60}{RST}")
