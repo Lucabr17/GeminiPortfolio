@@ -1,41 +1,4 @@
 {
-    "cash_balance": 65861.59999999999,
-    "positions": {
-        "NVDA_GROWTH": {
-            "entry_price": 210.69,
-            "shares": 56.95571693008686,
-            "allocated_capital": 12000.0,
-            "strategy_bucket": "GROWTH",
-            "purchase_date": "2026-06-18",
-            "buying_thesis": "High conviction AI play with unprecedented GPU demand and strong hypergrowth metrics. PWER score: 27.0.",
-            "high_watermark": 210.69
-        },
-        "ALAB_GROWTH": {
-            "entry_price": 417.07,
-            "shares": 13.378689428633084,
-            "allocated_capital": 5579.85,
-            "strategy_bucket": "GROWTH",
-            "purchase_date": "2026-06-18",
-            "buying_thesis": "Rapid adoption of PCIe/CXL connectivity in hyperscaler AI clusters driving hypergrowth. PWER score: 24.5.",
-            "high_watermark": 417.07
-        },
-        "BRK-B_VALUE": {
-            "entry_price": 489.46,
-            "shares": 20.43067870714665,
-            "allocated_capital": 10000.0,
-            "strategy_bucket": "VALUE",
-            "purchase_date": "2026-06-18",
-            "buying_thesis": "Deep value with a 95% margin of safety and record cash pile for accretive acquisitions. PWER score: 10.5.",
-            "high_watermark": 489.46
-        },
-        "QCOM_DIVIDEND": {
-            "entry_price": 226.11,
-            "shares": 29.00601477157136,
-            "allocated_capital": 6558.55,
-            "strategy_bucket": "DIVIDEND",
-            "purchase_date": "2026-06-18",
-            "buying_thesis": "High yield and ROE with an on-device AI supercycle catalyst. PWER score: 19.5.",
-            "high_watermark": 226.11
-        }
-    }
+    "cash_balance": 100000.0,
+    "positions": {}
 }
