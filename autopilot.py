@@ -1,21 +1,39 @@
 """
-GVD AUTONOMOUS PORTFOLIO SYSTEM — v3.1
+GVD AUTONOMOUS PORTFOLIO SYSTEM — v3.2
 =======================================================
 Based on:
   @theaiportfolios  — PWER ranking, 15-stock portfolio, opportunity cost engine
   Jeremy Lefebvre   — GVD framework: Growth + Value + Dividend
 
-v3.1 improvements:
-  + Pre-earnings trim ONLY when position is up >=35% (profit protection, not fear)
-  + Gemini retry wrapper with exponential back-off (3 attempts each call)
-  + PWER batched in chunks of 15 to avoid token-limit failures
-  + PWER recalculated in Python from raw components — AI math not trusted
-  + Probability normalisation (sums to 1.0 even if AI is slightly off)
-  + ATR-based default position sizing (volatile stocks get smaller positions)
-  + Minimum 30-day holding period blocks discretionary agent sells (not hard stops)
-  + High-watermarks saved to disk every monitoring cycle
-  + Bucket balance check: flags overweight / underweight allocations each run
-  + Expanded sector-name map handles yfinance naming inconsistencies
+v3.2 fixes (this round):
+  + FIXED: dividendYield bug — yfinance now sometimes returns this field
+    already in percentage-point form (1.72 = 1.72%) instead of decimal
+    (0.0172). Caused QCOM to score a fictitious "172% yield". Added a
+    normalizer that detects and corrects this automatically, with logging.
+  + FIXED: Graham Number distortion on conglomerates/insurers — Berkshire-
+    type businesses have GAAP EPS distorted by mark-to-market gains on
+    equity holdings, which blew up the Graham Number to ~95% "margin of
+    safety". Added (a) a cross-check between Graham and FCF methods — if
+    they diverge >3x, the conservative value is used instead of the
+    average, and (b) a hard anomaly cap: any raw MOS above 85% is now
+    flagged as a likely data artifact and excluded rather than auto-bought.
+  + FIXED: candidate bucket collision — if a stock qualified for two
+    buckets (e.g. Growth AND Dividend), the old {**g,**v,**d} merge
+    silently let one bucket's data overwrite the other at execution time.
+    Now de-duplicated by score, with logging when it happens.
+  + FIXED: NAV recomputation after mandatory exits used `high_watermark`
+    (the peak price ever seen) instead of current price — overstated NAV.
+    Now recomputed from the risk matrix's real current values.
+  + FIXED: existing-position data fed into PWER scoring used a placeholder
+    0.0 PnL via an unnecessary walrus/tuple hack. Replaced with real
+    current price + real PnL, sourced after position monitoring runs.
+  + IMPROVED: pipeline reordered — positions are now monitored and
+    mandatory exits executed BEFORE PWER scoring and the AI agents run,
+    so the AI never wastes a call evaluating something already sold, and
+    PWER scoring of existing holdings uses live prices, not entry prices.
+  + IMPROVED: added a sector concentration cap (35% NAV per sector) that
+    is enforced directly in the execution engine, not just inferred by
+    the AI's discretion.
 """
 
 import os, sys, re, json, time, logging
@@ -46,6 +64,23 @@ def _normalize_bucket(raw: str) -> str:
     if "VALUE"  in r or r == "V":  return BUCKET_V
     if "DIVID"  in r or r == "D":  return BUCKET_D
     return BUCKET_G
+
+
+def _normalize_dividend_yield(raw) -> float:
+    """
+    yfinance has changed `dividendYield` format across versions:
+    sometimes decimal (0.025 = 2.5%), sometimes already percentage-point
+    (2.5 = 2.5%). No real sustainable dividend yield exceeds 100%, so any
+    raw value above 1.0 is treated as already being in percentage-point
+    form and divided by 100.
+    """
+    if raw is None:
+        return 0.0
+    try:
+        raw = float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+    return raw / 100.0 if raw > 1.0 else raw
 
 
 def _verify_pwer(s: dict) -> dict:
@@ -92,10 +127,9 @@ def _call_gemini(prompt: str, temperature: float = 0.10,
 def _atr_size(ticker: str, nav: float, max_pct: float,
               risk_pct: float = 0.01) -> float:
     """
-    ATR-based position size.
-    Dollar risk = nav * risk_pct.  Stop = 2x ATR(14).
-    Capped at nav * max_pct.
-    High-volatility stocks automatically get smaller positions.
+    ATR-based position size. Dollar risk = nav * risk_pct, stop = 2x ATR(14).
+    Capped at nav * max_pct. High-volatility stocks automatically get
+    smaller positions for the same dollar-risk budget.
     """
     try:
         h = yf.Ticker(ticker).history(period="60d")
@@ -110,7 +144,50 @@ def _atr_size(ticker: str, nav: float, max_pct: float,
         shares = (nav * risk_pct) / (atr * 2)
         return min(shares * price, nav * max_pct)
     except Exception:
-        return nav * max_pct * 0.50  # fallback: half the max
+        return nav * max_pct * 0.50
+
+
+def merge_candidates_dedup(g: dict, v: dict, d: dict) -> dict:
+    """
+    A stock can occasionally qualify for more than one bucket (e.g. a
+    quality grower that also pays a solid dividend). Naively merging
+    dicts with {**g, **v, **d} lets the last bucket silently overwrite
+    the earlier one — corrupting bucket-specific data (trailing stop %,
+    max position size) used later at execution time.
+
+    This keeps the higher-scoring bucket assignment per ticker and logs
+    any conflict so it is visible in agent.log.
+    """
+    merged: dict = {}
+    for bucket_cands in (g, v, d):
+        for t, c in bucket_cands.items():
+            if t not in merged or c.get("score", 0) > merged[t].get("score", 0):
+                if t in merged:
+                    log_and_print(
+                        f"{YLW}[Dedup] {t} qualified for both "
+                        f"{merged[t]['bucket']} and {c['bucket']} — "
+                        f"keeping higher-scoring {c['bucket']}.{RST}"
+                    )
+                merged[t] = c
+    return merged
+
+
+def get_current_sector_exposure(portfolio: dict, risk_matrix: dict,
+                                total_nav: float) -> dict:
+    """Returns {sector: pct_of_nav} across all currently open positions."""
+    if total_nav <= 0:
+        return {}
+    exposure: dict = {}
+    for pk, pos in portfolio.get("positions", {}).items():
+        ticker = pk.split("_")[0]
+        try:
+            sector = yf.Ticker(ticker).info.get("sector", "Unknown")
+        except Exception:
+            sector = "Unknown"
+        val = risk_matrix.get(pk, {}).get("current_value",
+                                          pos.get("allocated_capital", 0))
+        exposure[sector] = exposure.get(sector, 0) + val
+    return {s: round(v / total_nav * 100, 1) for s, v in exposure.items()}
 
 
 # ============================================================
@@ -120,10 +197,15 @@ BUCKET_G = "GROWTH";   MAX_G = 0.50; CAP_G = 0.12; TRAIL_G = 20
 BUCKET_V = "VALUE";    MAX_V = 0.35; CAP_V = 0.10; TRAIL_V = 15
 BUCKET_D = "DIVIDEND"; MAX_D = 0.15; CAP_D = 0.08; TRAIL_D = 10
 
-TARGET_POSITIONS      = 15
-MIN_HOLD_DAYS         = 30    # no discretionary sells before this age
-EARNINGS_TRIM_PNL_MIN = 35    # % gain required before pre-earnings trim fires
-PWER_CHUNK            = 15    # max candidates per PWER API call
+TARGET_POSITIONS        = 15
+MIN_HOLD_DAYS           = 30    # no discretionary sells before this age
+EARNINGS_TRIM_PNL_MIN   = 35    # % gain required before pre-earnings trim fires
+PWER_CHUNK              = 15    # max candidates per PWER API call
+MAX_SECTOR_PCT          = 35.0  # max % of NAV in any single sector
+
+GRAHAM_DIVERGENCE_RATIO = 3.0   # methods disagreeing by more than this -> distrust optimistic one
+MOS_ANOMALY_THRESHOLD   = 85.0  # raw margin of safety above this = likely data artifact
+MOS_SCORING_CAP         = 70.0  # cap used for scoring so legit deep-value isn't over-weighted
 
 
 # ============================================================
@@ -248,33 +330,28 @@ def check_market_regime() -> dict:
     hyg  = _f("HYG",   "30d");  ief  = _f("IEF",  "30d")
     mmth = _f("^MMTH", "10d")
 
-    # Factor 1: SPY drawdown from 60-day high
     if not spy.empty:
         dd = ((spy["High"].max() - spy["Close"].iloc[-1]) /
               spy["High"].max()) * 100
         signals["spy_drawdown"] = round(dd, 2)
         rs += 30 if dd >= 10 else (15 if dd >= 5 else 0)
 
-    # Factor 2: VIX level
     if not vix.empty:
         v = float(vix["Close"].iloc[-1])
         signals["vix"] = round(v, 2)
         rs += 30 if v >= 35 else (20 if v >= 25 else (8 if v >= 18 else 0))
 
-    # Factor 3: Yield curve (10Y - 5Y spread)
     if not t10.empty and not t5.empty:
         sp = float(t10["Close"].iloc[-1]) - float(t5["Close"].iloc[-1])
         signals["yield_spread"] = round(sp, 3)
         rs += 20 if sp < -0.5 else (10 if sp < 0 else 0)
 
-    # Factor 4: Credit spreads proxy (HYG vs IEF 30-day return delta)
     if not hyg.empty and not ief.empty:
         dl = ((hyg["Close"].iloc[-1] / hyg["Close"].iloc[0] - 1) -
               (ief["Close"].iloc[-1] / ief["Close"].iloc[0] - 1)) * 100
         signals["credit_delta"] = round(dl, 2)
         rs += 20 if dl < -5 else (10 if dl < -2 else 0)
 
-    # Factor 5: Market breadth (% of S&P above 200-DMA)
     if not mmth.empty:
         br = float(mmth["Close"].iloc[-1])
         signals["breadth_pct"] = round(br, 1)
@@ -322,7 +399,6 @@ def scan_macro_tailwinds() -> tuple:
         "CONSUMER_RECOVERY":  ["XLY",  "XRT"],
     }
 
-    # yfinance sector strings vary — map both common variants
     SECTOR_MAP = {
         "Technology":             ["AI_SEMICONDUCTORS", "AI_SOFTWARE_CLOUD", "CYBERSECURITY"],
         "Information Technology": ["AI_SEMICONDUCTORS", "AI_SOFTWARE_CLOUD", "CYBERSECURITY"],
@@ -330,14 +406,14 @@ def scan_macro_tailwinds() -> tuple:
         "Energy":                 ["ENERGY_POWER_INFRA"],
         "Utilities":              ["ENERGY_POWER_INFRA"],
         "Industrials":            ["DEFENSE_AEROSPACE"],
-        "Healthcare":             ["HEALTHCARE_BIOTECH"],
-        "Health Care":            ["HEALTHCARE_BIOTECH"],
-        "Financial Services":     ["FINTECH_PAYMENTS"],
-        "Financials":             ["FINTECH_PAYMENTS"],
-        "Consumer Cyclical":      ["CONSUMER_RECOVERY"],
-        "Consumer Discretionary": ["CONSUMER_RECOVERY"],
-        "Consumer Defensive":     ["CONSUMER_RECOVERY"],
-        "Consumer Staples":       ["CONSUMER_RECOVERY"],
+        "Healthcare":              ["HEALTHCARE_BIOTECH"],
+        "Health Care":             ["HEALTHCARE_BIOTECH"],
+        "Financial Services":      ["FINTECH_PAYMENTS"],
+        "Financials":              ["FINTECH_PAYMENTS"],
+        "Consumer Cyclical":       ["CONSUMER_RECOVERY"],
+        "Consumer Discretionary":  ["CONSUMER_RECOVERY"],
+        "Consumer Defensive":      ["CONSUMER_RECOVERY"],
+        "Consumer Staples":        ["CONSUMER_RECOVERY"],
     }
 
     try:
@@ -371,14 +447,21 @@ def scan_macro_tailwinds() -> tuple:
 
 
 # ============================================================
-# 6. INTRINSIC VALUE ENGINE
+# 6. INTRINSIC VALUE ENGINE  (with anomaly guard)
 # ============================================================
 def calculate_intrinsic_value(info: dict) -> dict:
     """
     Method 1 — Graham Number:  sqrt(22.5 * EPS * BVPS)
     Method 2 — FCF Yield:      FCF/share / (discount - terminal_growth)
-    Fair value = average of valid methods.
-    Requires >=15% margin of safety to flag as undervalued.
+
+    Cross-check: GAAP EPS can be badly distorted for insurers and
+    conglomerates with large equity holdings (mark-to-market gains flow
+    through net income under ASU 2016-01). If the two methods diverge by
+    more than GRAHAM_DIVERGENCE_RATIO, the conservative (lower) value is
+    used instead of the average.
+
+    Hard guard: any raw margin of safety above MOS_ANOMALY_THRESHOLD is
+    flagged as a likely data artifact rather than a real opportunity.
     """
     price  = info.get("currentPrice") or info.get("regularMarketPrice") or 0
     eps    = info.get("trailingEps")   or 0
@@ -387,27 +470,49 @@ def calculate_intrinsic_value(info: dict) -> dict:
     shares = info.get("sharesOutstanding") or 1
     rev_g  = float(info.get("revenueGrowth") or 0)
 
-    vals: list = []
+    graham_val = None
+    fcf_val    = None
 
     if eps > 0 and bvps > 0:
-        vals.append((22.5 * eps * bvps) ** 0.5)
+        graham_val = (22.5 * eps * bvps) ** 0.5
 
     if fcf > 0 and shares > 0:
         tg = min(max(rev_g, 0.0), 0.03)
         dr = 0.10
         if dr > tg:
-            vals.append((fcf / shares) / (dr - tg))
+            fcf_val = (fcf / shares) / (dr - tg)
 
+    vals = [v for v in (graham_val, fcf_val) if v is not None]
     if not vals or price <= 0:
-        return {"intrinsic_value": 0, "margin_of_safety_pct": 0, "undervalued": False}
+        return {"intrinsic_value": 0, "margin_of_safety_pct": 0,
+                "raw_margin_of_safety_pct": 0,
+                "undervalued": False, "data_anomaly": False,
+                "method": "UNAVAILABLE"}
 
-    fv  = float(np.mean(vals))
-    mos = ((fv - price) / fv) * 100
+    if graham_val and fcf_val:
+        hi, lo = max(graham_val, fcf_val), min(graham_val, fcf_val)
+        if lo > 0 and hi / lo > GRAHAM_DIVERGENCE_RATIO:
+            fv     = lo  # distrust the optimistic outlier
+            method = "DIVERGENT_METHODS_CONSERVATIVE_VALUE_USED"
+        else:
+            fv     = float(np.mean(vals))
+            method = "GRAHAM_FCF_AVERAGE"
+    else:
+        fv     = float(np.mean(vals))
+        method = "SINGLE_METHOD"
+
+    mos_raw    = ((fv - price) / fv) * 100
+    is_anomaly = mos_raw > MOS_ANOMALY_THRESHOLD
+    mos_scored = min(mos_raw, MOS_SCORING_CAP)
+
     return {
-        "intrinsic_value":      round(fv, 2),
-        "current_price":        round(price, 2),
-        "margin_of_safety_pct": round(mos, 1),
-        "undervalued":          mos >= 15,
+        "intrinsic_value":          round(fv, 2),
+        "current_price":            round(price, 2),
+        "margin_of_safety_pct":     round(mos_scored, 1),
+        "raw_margin_of_safety_pct": round(mos_raw, 1),
+        "undervalued":              (mos_scored >= 15) and not is_anomaly,
+        "data_anomaly":             is_anomaly,
+        "method":                   method,
     }
 
 
@@ -448,14 +553,7 @@ def run_growth_screener(tickers: list, active_tailwinds: dict,
     """
     BUCKET G — Quality growth stocks aligned with confirmed macro tailwinds.
     Every qualifying stock must map to at least one active tailwind cluster.
-
-    Scoring (minimum 45 to qualify):
-      Tailwind strength  (0-30)
-      200W EMA support   (0-25)
-      Revenue growth     (0-20)
-      ROE / FCF / Margins (0-25)
-      6M relative strength (0-10)
-      PEG sanity check    (0-5)
+    Minimum score to qualify: 45.
     """
     log_and_print(f"{CYN}[G] Growth screener...{RST}")
     candidates: dict = {}
@@ -560,7 +658,7 @@ def run_value_screener(tickers: list) -> dict:
     """
     BUCKET V — Quality businesses trading below intrinsic value.
     Works in ALL market conditions; powerful in downturns.
-    Requires >=15% margin of safety. Min market cap $5B (avoid value traps).
+    Requires >=15% margin of safety (anomaly-checked). Min market cap $5B.
     """
     log_and_print(f"{CYN}[V] Value screener...{RST}")
     candidates: dict = {}
@@ -587,13 +685,25 @@ def run_value_screener(tickers: list) -> dict:
                 continue
 
             iv = calculate_intrinsic_value(info)
+            if iv.get("data_anomaly"):
+                log_and_print(
+                    f"{YLW}[V] {ticker} excluded — implausible margin of "
+                    f"safety ({iv.get('raw_margin_of_safety_pct')}%), "
+                    f"likely distorted EPS data.{RST}")
+                continue
             if not iv["undervalued"]:
                 continue
+
+            dy_raw = info.get("dividendYield")
+            dy     = _normalize_dividend_yield(dy_raw)
+            if dy_raw is not None and float(dy_raw) > 1.0:
+                log_and_print(
+                    f"{YLW}[Normalize] {ticker} dividendYield {dy_raw} "
+                    f"-> {round(dy*100,2)}%{RST}")
 
             fcy = (fcf / mktcap) if mktcap > 0 else 0
             pb  = float(info.get("priceToBook") or 99)
             fpe = float(info.get("forwardPE")   or  0)
-            dy  = float(info.get("dividendYield") or 0)
 
             sc = 0; tags = []
             mos = iv["margin_of_safety_pct"]
@@ -618,18 +728,19 @@ def run_value_screener(tickers: list) -> dict:
 
             if sc >= 35:
                 candidates[ticker] = {
-                    "bucket":               BUCKET_V,
-                    "price":                round(p, 2),
-                    "score":                sc,
-                    "tags":                 " | ".join(tags),
-                    "sector":               info.get("sector", "Unknown"),
-                    "intrinsic_value":      iv["intrinsic_value"],
-                    "margin_of_safety_pct": mos,
-                    "roe_pct":              round(roe * 100, 1),
-                    "fcf_yield_pct":        round(fcy * 100, 2),
-                    "pb_ratio":             round(pb, 2),
-                    "forward_pe":           round(fpe, 1) if fpe else "N/A",
-                    "div_yield_pct":        round(dy * 100, 2),
+                    "bucket":                   BUCKET_V,
+                    "price":                    round(p, 2),
+                    "score":                    sc,
+                    "tags":                     " | ".join(tags),
+                    "sector":                   info.get("sector", "Unknown"),
+                    "intrinsic_value":          iv["intrinsic_value"],
+                    "margin_of_safety_pct":     mos,
+                    "iv_method":                iv["method"],
+                    "roe_pct":                  round(roe * 100, 1),
+                    "fcf_yield_pct":            round(fcy * 100, 2),
+                    "pb_ratio":                 round(pb, 2),
+                    "forward_pe":               round(fpe, 1) if fpe else "N/A",
+                    "div_yield_pct":            round(dy * 100, 2),
                 }
             time.sleep(0.04)
         except Exception:
@@ -654,7 +765,13 @@ def run_dividend_screener(tickers: list) -> dict:
             t    = yf.Ticker(ticker)
             info = t.info
 
-            dy  = float(info.get("dividendYield")    or 0)
+            dy_raw = info.get("dividendYield")
+            dy     = _normalize_dividend_yield(dy_raw)
+            if dy_raw is not None and float(dy_raw) > 1.0:
+                log_and_print(
+                    f"{YLW}[Normalize] {ticker} dividendYield {dy_raw} "
+                    f"-> {round(dy*100,2)}%{RST}")
+
             pr  = float(info.get("payoutRatio")       or 1)
             fcf = float(info.get("freeCashflow")      or 0)
             dp  = float(info.get("dividendsPaid")     or 0)
@@ -722,8 +839,6 @@ def run_dividend_screener(tickers: list) -> dict:
 # ============================================================
 # 9. PWER ENGINE  (chunked + Python-verified)
 # ============================================================
-
-# Output format constant — avoids any inline problematic string literals
 _PWER_FORMAT = (
     '{"pwer_scores":['
     '{"ticker":"X","bucket":"GROWTH",'
@@ -793,25 +908,25 @@ def evaluate_open_positions(portfolio: dict, v_candidates: dict) -> tuple:
     Hard stop rules evaluated HERE in Python — mandatory exits never reach the AI.
 
     BUCKET G:
-      - Trailing stop -20% from peak       → MANDATORY_SELL
-      - Revenue growth <= 0                → MANDATORY_SELL (thesis broken)
-      - At -13% from peak                  → TRIM_50 warning
+      - Trailing stop -20% from peak       -> MANDATORY_SELL
+      - Revenue growth <= 0                -> MANDATORY_SELL (thesis broken)
+      - At -13% from peak                  -> TRIM_50 warning
 
     BUCKET V:
-      - Price reaches intrinsic value      → TAKE_PROFIT (mandatory)
-      - Trailing stop -15% from peak       → MANDATORY_SELL
-      - At -10% from peak                  → TRIM_50 warning
+      - Price reaches intrinsic value      -> TAKE_PROFIT (mandatory)
+      - Trailing stop -15% from peak       -> MANDATORY_SELL
+      - At -10% from peak                  -> TRIM_50 warning
 
     BUCKET D:
-      - Dividend cut detected              → MANDATORY_SELL
-      - Payout ratio > 85%                 → REVIEW warning
-      - Trailing stop -10% from peak       → MANDATORY_SELL
+      - Dividend cut detected              -> MANDATORY_SELL
+      - Payout ratio > 85%                 -> REVIEW warning
+      - Trailing stop -10% from peak       -> MANDATORY_SELL
 
     ALL BUCKETS:
-      - Pre-earnings AND PnL >= 35%        → TRIM_25_PRE_EARNINGS
-        (profit protection only — not triggered when flat / small gain)
-      - Age < MIN_HOLD_DAYS                → adds HOLD note to status
-        (does NOT apply to mandatory exits)
+      - Pre-earnings AND PnL >= 35%        -> TRIM_25_PRE_EARNINGS
+        (profit protection only — never fires when flat or at a loss)
+      - Age < MIN_HOLD_DAYS                -> adds a HOLD note to status
+        (does NOT suppress mandatory exits, only discretionary AI sells)
     """
     risk_matrix:     dict = {}
     mandatory_exits: list = []
@@ -820,7 +935,6 @@ def evaluate_open_positions(portfolio: dict, v_candidates: dict) -> tuple:
 
     log_and_print(f"{YLW}[Monitor] Evaluating positions (bucket-specific rules)...{RST}")
 
-    # ── 1. fetch current prices ──────────────────────────────────────
     for pk, pos in portfolio.get("positions", {}).items():
         ticker = pk.split("_")[0]
         try:
@@ -832,7 +946,6 @@ def evaluate_open_positions(portfolio: dict, v_candidates: dict) -> tuple:
 
     total_nav = portfolio["cash_balance"] + positions_value
 
-    # ── 2. evaluate each position ────────────────────────────────────
     for pk, pos in portfolio.get("positions", {}).items():
         ticker = pk.split("_")[0]
         bucket = _normalize_bucket(pos.get("strategy_bucket", BUCKET_G))
@@ -841,14 +954,12 @@ def evaluate_open_positions(portfolio: dict, v_candidates: dict) -> tuple:
         pnl    = ((cp - ep) / ep) * 100 if ep > 0 else 0
         wt     = (pos["shares"] * cp) / total_nav if total_nav > 0 else 0
 
-        # Update high-watermark
         hwm = float(pos.get("high_watermark", ep))
         if cp > hwm:
             hwm = cp
         portfolio["positions"][pk]["high_watermark"] = hwm
         dd = ((hwm - cp) / hwm) * 100 if hwm > 0 else 0
 
-        # Position age
         try:
             purchase_dt = datetime.strptime(
                 pos.get("purchase_date", "2020-01-01"), "%Y-%m-%d"
@@ -865,11 +976,9 @@ def evaluate_open_positions(portfolio: dict, v_candidates: dict) -> tuple:
             rg   = float(info.get("revenueGrowth", 0) or 0)
             pr   = float(info.get("payoutRatio",   0) or 0)
 
-            # ── Bucket G rules ────────────────────────────────────────
             if bucket == BUCKET_G:
                 if dd >= TRAIL_G:
-                    status  = (f"MANDATORY_SELL: G trailing stop "
-                               f"(-{round(dd,1)}% from peak)")
+                    status  = f"MANDATORY_SELL: G trailing stop (-{round(dd,1)}% from peak)"
                     is_mand = True
                 elif rg <= 0:
                     status  = "MANDATORY_SELL: G revenue growth turned negative"
@@ -877,21 +986,17 @@ def evaluate_open_positions(portfolio: dict, v_candidates: dict) -> tuple:
                 elif dd >= TRAIL_G * 0.65:
                     status = f"TRIM_50: G at -{round(dd,1)}% — approaching stop"
 
-            # ── Bucket V rules ────────────────────────────────────────
             elif bucket == BUCKET_V:
                 iv = v_candidates.get(ticker, {}).get("intrinsic_value", 0)
                 if iv > 0 and cp >= iv * 0.95:
-                    status  = (f"TAKE_PROFIT: V price ${cp} reached "
-                               f"intrinsic value ${iv}")
+                    status  = f"TAKE_PROFIT: V price ${cp} reached intrinsic value ${iv}"
                     is_mand = True
                 elif dd >= TRAIL_V:
-                    status  = (f"MANDATORY_SELL: V trailing stop "
-                               f"(-{round(dd,1)}% from peak)")
+                    status  = f"MANDATORY_SELL: V trailing stop (-{round(dd,1)}% from peak)"
                     is_mand = True
                 elif dd >= TRAIL_V * 0.65:
                     status = f"TRIM_50: V at -{round(dd,1)}% — approaching stop"
 
-            # ── Bucket D rules ────────────────────────────────────────
             elif bucket == BUCKET_D:
                 try:
                     dh = yf.Ticker(ticker).dividends
@@ -905,13 +1010,10 @@ def evaluate_open_positions(portfolio: dict, v_candidates: dict) -> tuple:
                     if pr > 0.85:
                         status = "REVIEW: D payout ratio >85% — dividend at risk"
                     elif dd >= TRAIL_D:
-                        status  = (f"MANDATORY_SELL: D trailing stop "
-                                   f"(-{round(dd,1)}% from peak)")
+                        status  = f"MANDATORY_SELL: D trailing stop (-{round(dd,1)}% from peak)"
                         is_mand = True
 
-            # ── Pre-earnings profit protection (ALL buckets) ──────────
-            # Only fires when you are up >=EARNINGS_TRIM_PNL_MIN% AND
-            # earnings are within 5 calendar days.
+            # Pre-earnings profit protection — ONLY fires when up >=35%.
             if not is_mand and pnl >= EARNINGS_TRIM_PNL_MIN:
                 try:
                     cal = yf.Ticker(ticker).calendar
@@ -930,7 +1032,6 @@ def evaluate_open_positions(portfolio: dict, v_candidates: dict) -> tuple:
                 except Exception:
                     pass
 
-            # ── Minimum holding period note (discretionary only) ──────
             if not is_mand and age_days < MIN_HOLD_DAYS:
                 status = status + f" [HOLD: {age_days}/{MIN_HOLD_DAYS}d min]"
 
@@ -940,11 +1041,8 @@ def evaluate_open_positions(portfolio: dict, v_candidates: dict) -> tuple:
 
         if is_mand:
             mandatory_exits.append({
-                "pos_key":       pk,
-                "ticker":        ticker,
-                "bucket":        bucket,
-                "status":        status,
-                "current_price": cp,
+                "pos_key": pk, "ticker": ticker, "bucket": bucket,
+                "status": status, "current_price": cp,
             })
 
         risk_matrix[pk] = {
@@ -960,20 +1058,18 @@ def evaluate_open_positions(portfolio: dict, v_candidates: dict) -> tuple:
             "is_mandatory_exit": is_mand,
         }
 
-    # Save updated high-watermarks to disk
-    save_portfolio(portfolio)
+    save_portfolio(portfolio)   # persist updated high-watermarks
     return risk_matrix, total_nav, mandatory_exits
 
 
 # ============================================================
 # 11. OPPORTUNITY COST ENGINE
 # ============================================================
-def run_opportunity_cost_engine(portfolio: dict, pwer_scores: dict,
-                                risk_matrix: dict) -> list:
+def run_opportunity_cost_engine(portfolio: dict, pwer_scores: dict) -> list:
     """
-    If an existing position's PWER is more than 15% below a replacement
-    candidate's PWER, flag it as a swap opportunity.
-    E.g. TMO at +5.3% PWER vs NVDA at +37.7% PWER — swap.
+    If an existing position's PWER is more than 15 points below a
+    replacement candidate's PWER, flag it as a swap opportunity.
+    E.g. TMO at +5.3% PWER vs NVDA at +37.7% PWER -> swap.
     """
     swaps: list = []
     if not pwer_scores or not portfolio.get("positions"):
@@ -1043,8 +1139,6 @@ def check_portfolio_balance(risk_matrix: dict, total_nav: float) -> tuple:
 # ============================================================
 # 13. MULTI-AGENT AI PIPELINE
 # ============================================================
-
-# Macro Agent prompt output-format constant
 _MACRO_FORMAT = (
     '{"positioning_bias":"AGGRESSIVE|NEUTRAL|DEFENSIVE",'
     '"strongest_tailwinds":["AI_SEMICONDUCTORS"],'
@@ -1053,7 +1147,6 @@ _MACRO_FORMAT = (
     '"increase_dividend_alloc":"YES|NO"}'
 )
 
-# Constructor Agent prompt output-format constant
 _ORDER_FORMAT = (
     '{"orders":['
     '{"action":"BUY|SELL","ticker":"X",'
@@ -1106,11 +1199,11 @@ def query_portfolio_constructor(
 ) -> list:
     """
     AGENT 2 — Selects new buys and opportunity-cost swaps.
-    Cannot override mandatory exits (those execute in Python).
+    Cannot override mandatory exits (those already executed in Python).
     Every buy order must cite the PWER score in analysis_display.
     """
-    avoid  = set(macro.get("sectors_to_avoid", []))
-    bias   = macro.get("positioning_bias", "NEUTRAL")
+    avoid = set(macro.get("sectors_to_avoid", []))
+    bias  = macro.get("positioning_bias", "NEUTRAL")
 
     def filt(cands):
         return {k: c for k, c in cands.items()
@@ -1123,9 +1216,9 @@ def query_portfolio_constructor(
     def add_pwer(cands):
         for t in cands:
             if t in pwer:
-                cands[t]["pwer_pct"]  = pwer[t].get("pwer_pct", 0)
-                cands[t]["catalyst"]  = pwer[t].get("key_catalyst", "")
-                cands[t]["risk"]      = pwer[t].get("key_risk", "")
+                cands[t]["pwer_pct"]   = pwer[t].get("pwer_pct", 0)
+                cands[t]["catalyst"]   = pwer[t].get("key_catalyst", "")
+                cands[t]["risk"]       = pwer[t].get("key_risk", "")
                 cands[t]["conviction"] = pwer[t].get("conviction", "MEDIUM")
             atr_val = _atr_size(
                 t, nav,
@@ -1155,7 +1248,7 @@ def query_portfolio_constructor(
         + json.dumps(sv, indent=2) + "\n\n"
         "DIVIDEND CANDIDATES (portfolio stability):\n"
         + json.dumps(sd, indent=2) + "\n\n"
-        "OPPORTUNITY COST SWAPS (>15% PWER improvement available):\n"
+        "OPPORTUNITY COST SWAPS (>15 point PWER improvement available):\n"
         + json.dumps(swaps, indent=2) + "\n\n"
         "Rules:\n"
         "1. Select 2-4 buys across G/V/D. In BEAR regime: no G, lean V+D.\n"
@@ -1178,8 +1271,7 @@ def query_portfolio_constructor(
 # ============================================================
 # 14. EXECUTION ENGINE
 # ============================================================
-def execute_mandatory_exits(mandatory_exits: list, portfolio: dict,
-                            risk_matrix: dict, total_nav: float) -> None:
+def execute_mandatory_exits(mandatory_exits: list, portfolio: dict) -> None:
     """Hard stop exits — Python-enforced, zero AI discretion."""
     for item in mandatory_exits:
         pk     = item["pos_key"]
@@ -1208,12 +1300,16 @@ def execute_mandatory_exits(mandatory_exits: list, portfolio: dict,
 def execute_agent_orders(orders: list, portfolio: dict, all_candidates: dict,
                          risk_matrix: dict, total_nav: float,
                          regime: dict) -> None:
-    """Execute agent BUY and SELL orders with ATR-aware position sizing."""
+    """
+    Execute agent BUY and SELL orders with ATR-aware position sizing,
+    bucket caps, AND a sector concentration cap (35% NAV per sector).
+    """
     if not orders:
         log_and_print(f"{YLW}[Exec] No agent orders.{RST}")
         return
 
     FLOOR = total_nav * regime.get("cash_floor_pct", 0.04)
+    sector_exposure = get_current_sector_exposure(portfolio, risk_matrix, total_nav)
 
     for o in orders:
         action = o.get("action", "").upper()
@@ -1228,7 +1324,6 @@ def execute_agent_orders(orders: list, portfolio: dict, all_candidates: dict,
                 pos = portfolio["positions"].get(pk)
                 if not pos:
                     continue
-                # Respect minimum holding period for discretionary sells
                 try:
                     purchase_dt = datetime.strptime(
                         pos.get("purchase_date", "2020-01-01"), "%Y-%m-%d"
@@ -1262,23 +1357,30 @@ def execute_agent_orders(orders: list, portfolio: dict, all_candidates: dict,
             if avail <= 0:
                 log_and_print(f"{YLW}[Exec] Cash floor reached — skip {ticker}.{RST}")
                 continue
-
             val = min(val, avail)
-            mp  = total_nav * regime["max_pos_pct"].get(bucket, 0.10)
-            exist = sum(p["allocated_capital"]
-                        for pk, p in portfolio["positions"].items()
-                        if pk.startswith(ticker))
-            val = min(val, max(0.0, mp - exist))
+
+            mp = total_nav * regime["max_pos_pct"].get(bucket, 0.10)
+            exist_bucket = sum(p["allocated_capital"]
+                               for pk, p in portfolio["positions"].items()
+                               if pk.startswith(ticker))
+            val = min(val, max(0.0, mp - exist_bucket))
+
+            cand_sector        = cand.get("sector", "Unknown")
+            current_sector_pct = sector_exposure.get(cand_sector, 0.0)
+            room_pct           = max(0.0, MAX_SECTOR_PCT - current_sector_pct)
+            val = min(val, total_nav * room_pct / 100.0)
 
             if val < 500:
-                log_and_print(f"{YLW}[Exec] {ticker} size ${round(val,2)} too small — skip.{RST}")
+                log_and_print(
+                    f"{YLW}[Exec] {ticker} blocked — sector '{cand_sector}' "
+                    f"at/near {MAX_SECTOR_PCT}% cap, or size too small.{RST}")
                 continue
 
-            cp  = cand.get("price", 0)
+            cp = cand.get("price", 0)
             if cp <= 0:
                 continue
 
-            sh     = val / cp
+            sh      = val / cp
             pos_key = f"{ticker}_{bucket}"
             portfolio["cash_balance"] -= val
 
@@ -1303,6 +1405,8 @@ def execute_agent_orders(orders: list, portfolio: dict, all_candidates: dict,
                     "buying_thesis":     rat,
                     "high_watermark":    cp,
                 }
+
+            sector_exposure[cand_sector] = current_sector_pct + (val / total_nav * 100)
 
             pwer_str = (f" | PWER:{cand.get('pwer_pct','?')}%"
                         if "pwer_pct" in cand else "")
@@ -1354,8 +1458,8 @@ def calculate_performance_metrics(portfolio: dict,
             t = pk.split("_")[0]
             w[t] = w.get(t, 0) + p["allocated_capital"] / tc
 
-        valid  = [t for t in tickers if t in px.columns]
-        pr     = pd.Series(0.0, index=px.index)
+        valid = [t for t in tickers if t in px.columns]
+        pr    = pd.Series(0.0, index=px.index)
         for t in valid:
             if t in w:
                 pr = pr + px[t].pct_change() * w[t]
@@ -1384,7 +1488,6 @@ def calculate_performance_metrics(portfolio: dict,
         tot  = ((1 + al["p"]).prod() - 1) * 100
         cal  = (mu - RF) / abs(mdd / 100) if mdd != 0 else 0
 
-        # Per-bucket breakdown
         bkt: dict = {}
         for pk, pos in portfolio["positions"].items():
             t = pk.split("_")[0]; b = pos.get("strategy_bucket", "?")
@@ -1479,7 +1582,7 @@ def check_and_send_weekly_summary(
 # ============================================================
 if __name__ == "__main__":
     log_and_print(f"{CYN}{'='*60}{RST}")
-    log_and_print(f"{CYN}   GVD PORTFOLIO SYSTEM v3.1 — INITIALIZING         {RST}")
+    log_and_print(f"{CYN}   GVD PORTFOLIO SYSTEM v3.2 — INITIALIZING         {RST}")
     log_and_print(f"{CYN}   Strategy: Growth + Value + Dividend | PWER        {RST}")
     log_and_print(f"{CYN}   Model: {GEMINI_MODEL}                             {RST}")
     log_and_print(f"{CYN}{'='*60}{RST}")
@@ -1487,76 +1590,77 @@ if __name__ == "__main__":
     portfolio = load_portfolio()
 
     # ── Phase 1: Market Intelligence ─────────────────────────────────
-    universe                       = get_macro_universe()
-    regime                         = check_market_regime()
-    active_tailwinds, sector_map   = scan_macro_tailwinds()
+    universe                     = get_macro_universe()
+    regime                       = check_market_regime()
+    active_tailwinds, sector_map = scan_macro_tailwinds()
 
     # ── Phase 2: Three-Bucket Screening ──────────────────────────────
     log_and_print(f"{CYN}[Phase 2] Running three-bucket screeners...{RST}")
     g_cands = run_growth_screener(universe, active_tailwinds, sector_map)
     v_cands = run_value_screener(universe)
     d_cands = run_dividend_screener(universe)
-    all_cands = {**g_cands, **v_cands, **d_cands}
+    all_cands = merge_candidates_dedup(g_cands, v_cands, d_cands)
     mines     = get_earnings_landmines(list(all_cands.keys()))
 
-    # ── Phase 3: PWER Scoring ─────────────────────────────────────────
-    # Score candidates + existing positions (needed for opportunity cost engine)
-    existing_pos_data = {
-        pk.split("_")[0]: {
-            "bucket": pos.get("strategy_bucket", ""),
-            "price":  pos.get("entry_price", 0),
-            "pnl_pct": (
-                (temp_cp := pos.get("entry_price", 1)),
-                round(0.0, 2)   # placeholder; accurate price fetched in monitor
-            )[1]
+    # ── Phase 3: Position Monitoring (BEFORE PWER / AI) ──────────────
+    risk_matrix, current_nav, mandatory_exits = evaluate_open_positions(
+        portfolio, v_cands)
+
+    # ── Phase 4: Mandatory Hard Stops (Python — zero AI discretion) ──
+    if mandatory_exits:
+        log_and_print(f"{RED}[Phase 4] Executing {len(mandatory_exits)} mandatory exits...{RST}")
+        execute_mandatory_exits(mandatory_exits, portfolio)
+        portfolio = load_portfolio()
+
+        exited_keys = {item["pos_key"] for item in mandatory_exits}
+        risk_matrix = {k: v for k, v in risk_matrix.items() if k not in exited_keys}
+        current_nav = portfolio["cash_balance"] + sum(
+            v["current_value"] for v in risk_matrix.values()
+        )
+
+    # ── Phase 5: Bucket Balance Check ─────────────────────────────────
+    bucket_pcts, balance_warnings = check_portfolio_balance(risk_matrix, current_nav)
+    for w in balance_warnings:
+        log_and_print(f"{YLW}[Balance] {w}{RST}")
+
+    # ── Phase 6: PWER Scoring (existing positions use LIVE prices) ───
+    existing_pos_data = {}
+    for pk, pos in portfolio.get("positions", {}).items():
+        ticker = pk.split("_")[0]
+        rm = risk_matrix.get(pk, {})
+        existing_pos_data[ticker] = {
+            "bucket":        pos.get("strategy_bucket", ""),
+            "current_price": rm.get("current_price", pos.get("entry_price", 0)),
+            "pnl_pct":       rm.get("pnl_pct", 0),
         }
-        for pk, pos in portfolio.get("positions", {}).items()
-    }
     pwer_input  = {**all_cands, **existing_pos_data}
     pwer_scores = calculate_pwer_batch(pwer_input, regime)
 
-    # ── Phase 4: Monitor, Risk & Opportunity Cost ─────────────────────
-    risk_matrix, current_nav, mandatory_exits = evaluate_open_positions(
-        portfolio, v_cands)
-    portfolio = load_portfolio()   # reload after watermark saves
+    # ── Phase 7: Opportunity Cost Engine ──────────────────────────────
+    swap_cands = run_opportunity_cost_engine(portfolio, pwer_scores)
 
-    bucket_pcts, balance_warnings = check_portfolio_balance(risk_matrix, current_nav)
-    performance   = calculate_performance_metrics(portfolio)
-    swap_cands    = run_opportunity_cost_engine(portfolio, pwer_scores, risk_matrix)
+    # ── Phase 8: Performance Attribution ──────────────────────────────
+    performance = calculate_performance_metrics(portfolio)
 
-    if balance_warnings:
-        for w in balance_warnings:
-            log_and_print(f"{YLW}[Balance] {w}{RST}")
-
-    # ── Phase 5: Mandatory Hard Stops (Python — no AI) ────────────────
-    if mandatory_exits:
-        log_and_print(f"{RED}[Phase 5] Executing {len(mandatory_exits)} mandatory exits...{RST}")
-        execute_mandatory_exits(mandatory_exits, portfolio, risk_matrix, current_nav)
-        portfolio   = load_portfolio()
-        current_nav = sum(
-            pos["shares"] * pos.get("high_watermark", pos["entry_price"])
-            for pos in portfolio["positions"].values()
-        ) + portfolio["cash_balance"]
-
-    # ── Phase 6: AI Agents ────────────────────────────────────────────
+    # ── Phase 9: AI Agents ─────────────────────────────────────────────
     macro_directives, _ = query_macro_agent(regime, risk_matrix, active_tailwinds)
-    agent_orders        = query_portfolio_constructor(
+    agent_orders         = query_portfolio_constructor(
         g_cands, v_cands, d_cands,
         pwer_scores, macro_directives, regime,
         portfolio, current_nav, mines, swap_cands, balance_warnings,
     )
 
-    # ── Phase 7: Execute Agent Orders ─────────────────────────────────
+    # ── Phase 10: Execute Agent Orders ────────────────────────────────
     execute_agent_orders(agent_orders, portfolio, all_cands,
                          risk_matrix, current_nav, regime)
     portfolio = load_portfolio()
 
-    # ── Phase 8: Weekly Report ─────────────────────────────────────────
+    # ── Phase 11: Weekly Report ───────────────────────────────────────
     check_and_send_weekly_summary(
         portfolio, risk_matrix, current_nav,
         performance, bucket_pcts, balance_warnings,
     )
 
     log_and_print(f"{CYN}{'='*60}{RST}")
-    log_and_print(f"{CYN}   GVD SYSTEM v3.1 CYCLE COMPLETE                   {RST}")
+    log_and_print(f"{CYN}   GVD SYSTEM v3.2 CYCLE COMPLETE                   {RST}")
     log_and_print(f"{CYN}{'='*60}{RST}")
