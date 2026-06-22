@@ -1,41 +1,4 @@
 {
-    "cash_balance": 64420.259999999995,
-    "positions": {
-        "NVDA_GROWTH": {
-            "entry_price": 210.69,
-            "shares": 56.95571693008686,
-            "allocated_capital": 12000.0,
-            "strategy_bucket": "GROWTH",
-            "purchase_date": "2026-06-19",
-            "buying_thesis": "Initiating Growth position in NVDA given its exceptional PWER score of 24.75 and strong AI tailwinds.",
-            "high_watermark": 210.69
-        },
-        "ALAB_GROWTH": {
-            "entry_price": 417.07,
-            "shares": 13.378425683937948,
-            "allocated_capital": 5579.74,
-            "strategy_bucket": "GROWTH",
-            "purchase_date": "2026-06-19",
-            "buying_thesis": "Adding ALAB to the Growth bucket with a high PWER score of 21.75, supported by hypergrowth and AI connectivity demand.",
-            "high_watermark": 417.07
-        },
-        "VZ_VALUE": {
-            "entry_price": 45.37,
-            "shares": 220.4099625303064,
-            "allocated_capital": 10000.0,
-            "strategy_bucket": "VALUE",
-            "purchase_date": "2026-06-19",
-            "buying_thesis": "Establishing Value position in VZ with a PWER score of 8.9, offering a 20% margin of safety and strong FCF yield.",
-            "high_watermark": 45.37
-        },
-        "META_DIVIDEND": {
-            "entry_price": 577.22,
-            "shares": 13.85953362669346,
-            "allocated_capital": 8000.0,
-            "strategy_bucket": "DIVIDEND",
-            "purchase_date": "2026-06-19",
-            "buying_thesis": "Adding META to the Dividend bucket with a PWER score of 17.25, combining high ROE with a conservative payout ratio.",
-            "high_watermark": 577.22
-        }
-    }
+    "cash_balance": 100000.0,
+    "positions": {}
 }
