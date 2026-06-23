@@ -1,5 +1,5 @@
 {
-    "cash_balance": 47112.616836034525,
+    "cash_balance": 38076.350288212634,
     "positions": {
         "ALAB_GROWTH": {
             "entry_price": 417.07,
@@ -17,7 +17,7 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-06-22",
             "buying_thesis": "Initiating CRM for Growth exposure. With a PWER score of 26.75 and a massive 13.3% FCF yield, it offers a compelling setup for mean reversion.",
-            "high_watermark": 151.78
+            "high_watermark": 153.4199981689453
         },
         "VZ_VALUE": {
             "entry_price": 45.37,
@@ -26,7 +26,7 @@
             "strategy_bucket": "VALUE",
             "purchase_date": "2026-06-22",
             "buying_thesis": "Buying VZ for the Value bucket. It provides a 20% margin of safety and a solid PWER score of 8.0, supported by a high FCF yield.",
-            "high_watermark": 45.37
+            "high_watermark": 46.72999954223633
         },
         "WFC_DIVIDEND": {
             "entry_price": 82.2,
@@ -35,7 +35,7 @@
             "strategy_bucket": "DIVIDEND",
             "purchase_date": "2026-06-22",
             "buying_thesis": "Adding WFC to the Dividend bucket. It features a conservative payout ratio and a strong PWER score of 12.6, offering portfolio stability.",
-            "high_watermark": 83.83999633789062
+            "high_watermark": 84.12999725341797
         },
         "NVDA_GROWTH": {
             "entry_price": 208.65,
@@ -63,6 +63,24 @@
             "purchase_date": "2026-06-22",
             "buying_thesis": "Adding AVGO with a PWER score of 17.75. High conviction growth play with strong ROE and hyperscaler demand.",
             "high_watermark": 392.13
+        },
+        "PLTR_GROWTH": {
+            "entry_price": 116.7,
+            "shares": 9.359867590590303,
+            "allocated_capital": 1092.2965478218885,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-06-23",
+            "buying_thesis": "Adding PLTR to capture AI software momentum in a BULL regime. Strong hypergrowth profile with a PWER score of 23.0, fitting well within our aggressive macro bias.",
+            "high_watermark": 116.7
+        },
+        "PG_DIVIDEND": {
+            "entry_price": 150.86,
+            "shares": 52.6578947368421,
+            "allocated_capital": 7943.97,
+            "strategy_bucket": "DIVIDEND",
+            "purchase_date": "2026-06-23",
+            "buying_thesis": "Adding PG to bolster the dividend bucket with a high-ROE defensive name. It offers a growing dividend and stability with a PWER score of 8.8.",
+            "high_watermark": 150.86
         }
     }
 }
