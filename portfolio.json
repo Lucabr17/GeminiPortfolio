@@ -1,5 +1,5 @@
 {
-    "cash_balance": 38076.350288212634,
+    "cash_balance": 30188.730288212635,
     "positions": {
         "ALAB_GROWTH": {
             "entry_price": 417.07,
@@ -35,7 +35,7 @@
             "strategy_bucket": "DIVIDEND",
             "purchase_date": "2026-06-22",
             "buying_thesis": "Adding WFC to the Dividend bucket. It features a conservative payout ratio and a strong PWER score of 12.6, offering portfolio stability.",
-            "high_watermark": 84.30000305175781
+            "high_watermark": 84.73999786376953
         },
         "NVDA_GROWTH": {
             "entry_price": 208.65,
@@ -81,6 +81,15 @@
             "purchase_date": "2026-06-23",
             "buying_thesis": "Adding PG to bolster the dividend bucket with a high-ROE defensive name. It offers a growing dividend and stability with a PWER score of 8.8.",
             "high_watermark": 152.0399932861328
+        },
+        "JNJ_DIVIDEND": {
+            "entry_price": 244.88,
+            "shares": 32.21014374387455,
+            "allocated_capital": 7887.62,
+            "strategy_bucket": "DIVIDEND",
+            "purchase_date": "2026-06-25",
+            "buying_thesis": "Adding JNJ to the Dividend bucket for portfolio stability. It has a PWER score of 7.8 and offers a reliable yield with strong pipeline execution.",
+            "high_watermark": 244.88
         }
     }
 }
