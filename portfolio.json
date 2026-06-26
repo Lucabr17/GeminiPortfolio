@@ -1,5 +1,5 @@
 {
-    "cash_balance": 30188.730288212635,
+    "cash_balance": 18325.444022205324,
     "positions": {
         "ALAB_GROWTH": {
             "entry_price": 417.07,
@@ -17,7 +17,7 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-06-22",
             "buying_thesis": "Initiating CRM for Growth exposure. With a PWER score of 26.75 and a massive 13.3% FCF yield, it offers a compelling setup for mean reversion.",
-            "high_watermark": 153.4199981689453
+            "high_watermark": 158.3699951171875
         },
         "VZ_VALUE": {
             "entry_price": 45.37,
@@ -89,7 +89,16 @@
             "strategy_bucket": "DIVIDEND",
             "purchase_date": "2026-06-25",
             "buying_thesis": "Adding JNJ to the Dividend bucket for portfolio stability. It has a PWER score of 7.8 and offers a reliable yield with strong pipeline execution.",
-            "high_watermark": 244.88
+            "high_watermark": 254.66000366210938
+        },
+        "LLY_GROWTH": {
+            "entry_price": 1208.12,
+            "shares": 9.819625754070216,
+            "allocated_capital": 11863.28626600731,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-06-26",
+            "buying_thesis": "Adding LLY with a strong PWER score of 17.75. Explosive GLP-1 demand and high ROE make it a top growth candidate in a bull regime.",
+            "high_watermark": 1208.12
         }
     }
 }
