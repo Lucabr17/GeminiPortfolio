@@ -8,7 +8,7 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-06-22",
             "buying_thesis": "Adding ALAB to the Growth bucket in this aggressive bull regime. It boasts an exceptional PWER score of 31.75, driven by hypergrowth and strong AI tailwinds.",
-            "high_watermark": 439.6600036621094
+            "high_watermark": 455.9599914550781
         },
         "CRM_GROWTH": {
             "entry_price": 151.78,
@@ -89,7 +89,7 @@
             "strategy_bucket": "DIVIDEND",
             "purchase_date": "2026-06-25",
             "buying_thesis": "Adding JNJ to the Dividend bucket for portfolio stability. It has a PWER score of 7.8 and offers a reliable yield with strong pipeline execution.",
-            "high_watermark": 254.66000366210938
+            "high_watermark": 258.510009765625
         },
         "LLY_GROWTH": {
             "entry_price": 1208.12,
@@ -98,7 +98,7 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-06-26",
             "buying_thesis": "Adding LLY with a strong PWER score of 17.75. Explosive GLP-1 demand and high ROE make it a top growth candidate in a bull regime.",
-            "high_watermark": 1208.12
+            "high_watermark": 1229.9300537109375
         }
     }
 }
