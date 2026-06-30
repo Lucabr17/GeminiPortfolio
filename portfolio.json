@@ -1,5 +1,5 @@
 {
-    "cash_balance": 18325.444022205324,
+    "cash_balance": 8352.094022205323,
     "positions": {
         "ALAB_GROWTH": {
             "entry_price": 417.07,
@@ -8,7 +8,7 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-06-22",
             "buying_thesis": "Adding ALAB to the Growth bucket in this aggressive bull regime. It boasts an exceptional PWER score of 31.75, driven by hypergrowth and strong AI tailwinds.",
-            "high_watermark": 455.9599914550781
+            "high_watermark": 483.0199890136719
         },
         "CRM_GROWTH": {
             "entry_price": 151.78,
@@ -99,6 +99,15 @@
             "purchase_date": "2026-06-26",
             "buying_thesis": "Adding LLY with a strong PWER score of 17.75. Explosive GLP-1 demand and high ROE make it a top growth candidate in a bull regime.",
             "high_watermark": 1229.9300537109375
+        },
+        "T_VALUE": {
+            "entry_price": 20.7,
+            "shares": 481.804347826087,
+            "allocated_capital": 9973.35,
+            "strategy_bucket": "VALUE",
+            "purchase_date": "2026-06-30",
+            "buying_thesis": "Adding T to balance the portfolio towards the Value bucket, offering a 17.8% margin of safety and a PWER score of 11.5.",
+            "high_watermark": 20.7
         }
     }
 }
