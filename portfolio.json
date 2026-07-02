@@ -1,5 +1,5 @@
 {
-    "cash_balance": 8352.094022205323,
+    "cash_balance": 8419.509363401532,
     "positions": {
         "ALAB_GROWTH": {
             "entry_price": 417.07,
@@ -17,7 +17,7 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-06-22",
             "buying_thesis": "Initiating CRM for Growth exposure. With a PWER score of 26.75 and a massive 13.3% FCF yield, it offers a compelling setup for mean reversion.",
-            "high_watermark": 163.22999572753906
+            "high_watermark": 166.11000061035156
         },
         "VZ_VALUE": {
             "entry_price": 45.37,
@@ -46,15 +46,6 @@
             "buying_thesis": "Replacement for VZ swap. NVDA offers a massive PWER improvement (26.0 vs 8.9) and aligns with the aggressive bull regime.",
             "high_watermark": 208.65
         },
-        "MRVL_GROWTH": {
-            "entry_price": 307.86,
-            "shares": 13.207237055804587,
-            "allocated_capital": 4065.98,
-            "strategy_bucket": "GROWTH",
-            "purchase_date": "2026-06-22",
-            "buying_thesis": "Adding MRVL for its strong PWER score of 18.5 and excellent 6-month relative strength, capitalizing on AI infrastructure tailwinds.",
-            "high_watermark": 307.86
-        },
         "AVGO_GROWTH": {
             "entry_price": 392.13,
             "shares": 11.38646154072747,
@@ -71,7 +62,7 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-06-23",
             "buying_thesis": "Adding PLTR to capture AI software momentum in a BULL regime. Strong hypergrowth profile with a PWER score of 23.0, fitting well within our aggressive macro bias.",
-            "high_watermark": 125.7300033569336
+            "high_watermark": 129.3000030517578
         },
         "PG_DIVIDEND": {
             "entry_price": 150.86,
@@ -89,7 +80,7 @@
             "strategy_bucket": "DIVIDEND",
             "purchase_date": "2026-06-25",
             "buying_thesis": "Adding JNJ to the Dividend bucket for portfolio stability. It has a PWER score of 7.8 and offers a reliable yield with strong pipeline execution.",
-            "high_watermark": 258.510009765625
+            "high_watermark": 263.0400085449219
         },
         "LLY_GROWTH": {
             "entry_price": 1208.12,
@@ -108,6 +99,15 @@
             "purchase_date": "2026-06-30",
             "buying_thesis": "Adding T to balance the portfolio towards the Value bucket, offering a 17.8% margin of safety and a PWER score of 11.5.",
             "high_watermark": 20.7
+        },
+        "MRVL_GROWTH": {
+            "entry_price": 245.29,
+            "shares": 12.93239735639636,
+            "allocated_capital": 3172.187747550463,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-07-02",
+            "buying_thesis": "Executing opportunity cost swap from PG. MRVL offers a massive PWER improvement to 30.25, driven by surging AI compute silicon demand.",
+            "high_watermark": 245.29
         }
     }
 }
