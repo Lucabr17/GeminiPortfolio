@@ -1,0 +1,9 @@
+# Put this file at:  .streamlit/config.toml   (in your repo root)
+# Gives the dashboard a dark theme that matches the rest of your tools.
+
+[theme]
+base = "dark"
+primaryColor = "#5B8DEF"
+backgroundColor = "#0B0E14"
+secondaryBackgroundColor = "#161D2A"
+textColor = "#E6EAF2"
