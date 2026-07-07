@@ -1,5 +1,5 @@
 {
-    "cash_balance": 4000.0,
+    "cash_balance": 4000.000000000001,
     "positions": {
         "MU_GROWTH": {
             "entry_price": 984.75,
@@ -13,7 +13,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 28.2,
-            "pwer_last_known": 28.2,
+            "pwer_last_known": 19.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -36,12 +36,12 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-07-06",
             "buying_thesis": "Adding to AI Semiconductors per sector directive. PWER score of 24.0 and MODERATE thesis strength with HIGH conviction. Undisputed AI leader with 85% revenue growth and 114% ROE.",
-            "high_watermark": 195.5500030517578,
+            "high_watermark": 196.92999267578125,
             "trim_count": 0,
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 24.0,
-            "pwer_last_known": 24.0,
+            "pwer_last_known": 21.8,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -64,7 +64,7 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-07-06",
             "buying_thesis": "Diversifying into Healthcare Biotech. PWER score of 21.75 and MODERATE thesis strength with HIGH conviction. Unprecedented GLP-1 demand driving 55.5% revenue growth.",
-            "high_watermark": 1200.06005859375,
+            "high_watermark": 1235.56005859375,
             "trim_count": 0,
             "tailwind_at_entry": "HEALTHCARE_BIOTECH",
             "regime_at_entry": "BULL",
@@ -92,12 +92,12 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-07-06",
             "buying_thesis": "Capitalizing on a narrative gap. PWER score of 19.25 and MODERATE thesis strength with HIGH conviction. De-rated 44% despite 89% gross margins and 12.7% revenue growth.",
-            "high_watermark": 218.07000732421875,
+            "high_watermark": 221.5399932861328,
             "trim_count": 0,
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.2,
-            "pwer_last_known": 19.2,
+            "pwer_last_known": 14.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -112,10 +112,66 @@
                 }
             ],
             "data_unavailable_streak": 0
+        },
+        "ORCL_GROWTH": {
+            "entry_price": 141.60000610351562,
+            "shares": 50.56700347008125,
+            "allocated_capital": 7160.2880000000005,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-07-07",
+            "buying_thesis": "PWER 16.5, MODERATE thesis strength. OCI capturing more AI training workloads, closing the 59% derating gap. Sized at Kelly adjusted max.",
+            "high_watermark": 141.60000610351562,
+            "trim_count": 0,
+            "tailwind_at_entry": "UNCATEGORIZED",
+            "regime_at_entry": "BULL",
+            "pwer_at_entry": 16.5,
+            "pwer_last_known": 16.5,
+            "last_reunderwritten": null,
+            "forced_review_fail_streak": 0,
+            "dip_buy_count": 0,
+            "last_dip_buy_date": null,
+            "thesis_log": [
+                {
+                    "date": "2026-07-07",
+                    "action": "INITIAL_BUY",
+                    "usd": 7160.29,
+                    "price": 141.6,
+                    "thesis": "Oracle is a new 7.2 percent position, built on the thesis that the market overly penalized the stock for capital expenditures while ignoring its cloud infrastructure momentum.\n\nThe bear case centers on heavy capex requirements pressuring free cash flow generation, which drove a 59 percent de-rating. However, the underlying fundamentals show growth remains intact at 15 percent. Our models project a 16.5 percent expected return as Oracle Cloud Infrastructure captures more AI training workloads, effectively closing the current narrative gap. A robust bull macro regime with a subdued VIX of 16.13 provides a supportive backdrop for this multiple expansion.\n\nI am watching the September 8 earnings print as the next test to confirm workload capture is outpacing the capex drag.\n\nPosting reasoning, not a recommendation."
+                }
+            ],
+            "data_unavailable_streak": 0
+        },
+        "CRM_GROWTH": {
+            "entry_price": 169.52000427246094,
+            "shares": 46.025113870690774,
+            "allocated_capital": 7802.177500000001,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-07-07",
+            "buying_thesis": "PWER 18.0, MODERATE thesis strength. Data Cloud and Agentforce adoption re-accelerating top-line growth, closing the 38% derating gap. Sized at Kelly adjusted max.",
+            "high_watermark": 169.52000427246094,
+            "trim_count": 0,
+            "tailwind_at_entry": "UNCATEGORIZED",
+            "regime_at_entry": "BULL",
+            "pwer_at_entry": 18.0,
+            "pwer_last_known": 18.0,
+            "last_reunderwritten": null,
+            "forced_review_fail_streak": 0,
+            "dip_buy_count": 0,
+            "last_dip_buy_date": null,
+            "thesis_log": [
+                {
+                    "date": "2026-07-07",
+                    "action": "INITIAL_BUY",
+                    "usd": 7802.18,
+                    "price": 169.52,
+                    "thesis": "CRM is a new 7.8 percent position for the Growth bucket, bought because Data Cloud and Agentforce adoption are poised to re-accelerate top-line growth and close a 38 percent derating gap.\n\nThe market fears that AI automation will reduce enterprise headcount, directly pressuring the core seat-based pricing model of the company. However, this narrative gap ignores the shifting revenue mix. Agentforce and Data Cloud are driving non-seat adoption, supporting an 18 percent upside in our probability-weighted expected return scenario. With a screener score of 70.4 and a robust bull regime providing a healthy technical backdrop, the fundamentals validate the current valuation rather than the structural decline fears. \n\nThe September 2 earnings print will be the next concrete test of this top-line re-acceleration.\n\nPosting reasoning, not a recommendation."
+                }
+            ],
+            "data_unavailable_streak": 0
         }
     },
     "sleeve": {
         "ticker": "SPY",
-        "shares": 84.50253104613448
+        "shares": 64.49147721469716
     }
 }
