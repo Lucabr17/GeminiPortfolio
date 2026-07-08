@@ -1,5 +1,5 @@
 {
-    "cash_balance": 4000.000000000001,
+    "cash_balance": 3995.820187253037,
     "positions": {
         "MU_GROWTH": {
             "entry_price": 984.75,
@@ -13,7 +13,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 28.2,
-            "pwer_last_known": 19.5,
+            "pwer_last_known": 16.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -36,12 +36,12 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-07-06",
             "buying_thesis": "Adding to AI Semiconductors per sector directive. PWER score of 24.0 and MODERATE thesis strength with HIGH conviction. Undisputed AI leader with 85% revenue growth and 114% ROE.",
-            "high_watermark": 196.92999267578125,
+            "high_watermark": 204.1199951171875,
             "trim_count": 0,
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 24.0,
-            "pwer_last_known": 21.8,
+            "pwer_last_known": 19.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -69,7 +69,7 @@
             "tailwind_at_entry": "HEALTHCARE_BIOTECH",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 21.8,
-            "pwer_last_known": 21.8,
+            "pwer_last_known": 15.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -97,7 +97,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.2,
-            "pwer_last_known": 14.0,
+            "pwer_last_known": 12.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -125,7 +125,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 16.5,
-            "pwer_last_known": 16.5,
+            "pwer_last_known": 11.1,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -153,7 +153,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.0,
-            "pwer_last_known": 18.0,
+            "pwer_last_known": 12.3,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -168,10 +168,66 @@
                 }
             ],
             "data_unavailable_streak": 0
+        },
+        "GRAB_GROWTH": {
+            "entry_price": 3.809999942779541,
+            "shares": 2375.435206279132,
+            "allocated_capital": 9050.408000000001,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-07-08",
+            "buying_thesis": "Initiating position in GRAB. Committee debate yielded a MODERATE thesis strength and a PWER score of 74.2. The stock suffers from a 42% narrative gap de-rating despite intact 23.5% YoY revenue growth and record Adjusted EBITDA, disproving fears over board exits. Sized exactly to kelly_adjusted_max_usd.",
+            "high_watermark": 3.809999942779541,
+            "trim_count": 0,
+            "tailwind_at_entry": "UNCATEGORIZED",
+            "regime_at_entry": "BULL",
+            "pwer_at_entry": 19.8,
+            "pwer_last_known": 19.8,
+            "last_reunderwritten": null,
+            "forced_review_fail_streak": 0,
+            "dip_buy_count": 0,
+            "last_dip_buy_date": null,
+            "thesis_log": [
+                {
+                    "date": "2026-07-08",
+                    "action": "INITIAL_BUY",
+                    "usd": 9050.41,
+                    "price": 3.81,
+                    "thesis": "Grab is a new Growth position at 9.1 percent of NAV, and the thesis is straightforward: the market de-rated it 42 percent on leadership fears that contradict the actual fundamentals.\n\nThe bear case is that the board resignation of Uber CEO Dara Khosrowshahi and insider selling by CEO Anthony Tan signal internal turmoil and weakening Southeast Asian consumer spending. The reality is the board exit was a regulatory necessity driven by overlapping foodpanda acquisitions, and Uber kept its 14 percent stake. First-quarter revenue increased 23.5 percent year-over-year, and Adjusted EBITDA expanded 46 percent to a record $154 million, proving the growth thesis remains intact.\n\nI own the narrative gap, with the July 29 earnings print as the next test for sustained margin expansion.\n\nPosting reasoning, not a recommendation."
+                }
+            ],
+            "data_unavailable_streak": 0
+        },
+        "SE_GROWTH": {
+            "entry_price": 105.30999755859375,
+            "shares": 84.62900205691554,
+            "allocated_capital": 8912.28,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-07-08",
+            "buying_thesis": "Initiating position in SE. Committee debate resulted in a MODERATE thesis strength and a PWER score of 68.6. The 47% de-rating presents a compelling narrative gap opportunity, as Q1 results (46.6% YoY revenue growth and $1B+ EBITDA) completely invalidate fears of a margin-crushing price war. Sized at kelly_adjusted_max_usd.",
+            "high_watermark": 105.30999755859375,
+            "trim_count": 0,
+            "tailwind_at_entry": "UNCATEGORIZED",
+            "regime_at_entry": "BULL",
+            "pwer_at_entry": 22.5,
+            "pwer_last_known": 22.5,
+            "last_reunderwritten": null,
+            "forced_review_fail_streak": 0,
+            "dip_buy_count": 0,
+            "last_dip_buy_date": null,
+            "thesis_log": [
+                {
+                    "date": "2026-07-08",
+                    "action": "INITIAL_BUY",
+                    "usd": 8912.28,
+                    "price": 105.31,
+                    "thesis": "Sea Limited is a new 8.9 percent position, and this is the thesis: the market de-rated it 47 percent on a price war fear the company is actively disproving.\n\nThe bear case was that intense TikTok competition in Southeast Asia would force Shopee to sacrifice EBITDA, a fear that peaked after flat 2026 margin guidance. Sea's answer in Q1 2026 exposed a clear narrative gap: revenue grew 46.6 percent year-over-year to $7.1 billion, and Adjusted EBITDA crossed $1 billion for the first time.\n\nShopee is proving it can expand margins and gross merchandise value simultaneously. The fundamentals show growth remains intact, so the margin-crushing fears are not showing up in the unit economics. I own the disconnect, with the estimated August 11 print as the next test.\n\nPosting reasoning, not a recommendation."
+                }
+            ],
+            "data_unavailable_streak": 0
         }
     },
     "sleeve": {
         "ticker": "SPY",
-        "shares": 64.49147721469716
+        "shares": 40.399033427390194
     }
 }
