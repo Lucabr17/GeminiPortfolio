@@ -1,5 +1,5 @@
 {
-    "cash_balance": 3995.820187253037,
+    "cash_balance": 3984.353712993422,
     "positions": {
         "MU_GROWTH": {
             "entry_price": 984.75,
@@ -13,7 +13,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 28.2,
-            "pwer_last_known": 15.5,
+            "pwer_last_known": 23.8,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -36,12 +36,12 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-07-06",
             "buying_thesis": "Adding to AI Semiconductors per sector directive. PWER score of 24.0 and MODERATE thesis strength with HIGH conviction. Undisputed AI leader with 85% revenue growth and 114% ROE.",
-            "high_watermark": 210.9600067138672,
+            "high_watermark": 211.8000030517578,
             "trim_count": 0,
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 24.0,
-            "pwer_last_known": 20.8,
+            "pwer_last_known": 22.8,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -97,7 +97,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.2,
-            "pwer_last_known": 22.0,
+            "pwer_last_known": 17.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -125,7 +125,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 16.5,
-            "pwer_last_known": 14.0,
+            "pwer_last_known": 9.8,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -153,7 +153,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.0,
-            "pwer_last_known": 9.5,
+            "pwer_last_known": 17.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -181,7 +181,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.8,
-            "pwer_last_known": 15.5,
+            "pwer_last_known": 12.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -209,7 +209,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 22.5,
-            "pwer_last_known": 14.5,
+            "pwer_last_known": 12.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -237,8 +237,8 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 26.5,
-            "pwer_last_known": 8.8,
-            "last_reunderwritten": null,
+            "pwer_last_known": 5.4,
+            "last_reunderwritten": "2026-07-14",
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
             "last_dip_buy_date": null,
@@ -280,10 +280,38 @@
                 }
             ],
             "data_unavailable_streak": 0
+        },
+        "CRM_VALUE": {
+            "entry_price": 167.55999755859375,
+            "shares": 13.421546402787088,
+            "allocated_capital": 2248.914282483557,
+            "strategy_bucket": "VALUE",
+            "purchase_date": "2026-07-14",
+            "buying_thesis": "PWER score 72.0, thesis MODERATE. Deep 89.3% historical discount with 12.06% FCF yield. Strong cash-flow compounder fitting the Value mandate.",
+            "high_watermark": 167.55999755859375,
+            "trim_count": 0,
+            "tailwind_at_entry": "UNCATEGORIZED",
+            "regime_at_entry": "BULL",
+            "pwer_at_entry": 17.5,
+            "pwer_last_known": 17.5,
+            "last_reunderwritten": null,
+            "forced_review_fail_streak": 0,
+            "dip_buy_count": 0,
+            "last_dip_buy_date": null,
+            "thesis_log": [
+                {
+                    "date": "2026-07-14",
+                    "action": "INITIAL_BUY",
+                    "usd": 2248.91,
+                    "price": 167.56,
+                    "thesis": "Salesforce is a new 2.3 percent position because its transition into a cash-flow compounder sets up a multiple expansion cycle driven by capital returns.\n\nThe core enterprise software franchise remains highly cash-generative, yet the market has compressed its valuation to a 10.8x forward earnings multiple. By aggressively repurchasing shares while sustaining a double-digit free cash flow yield, the company is forcing a re-rating. This capital return strategy directly drives multiple expansion even if top-line growth normalizes, providing an asymmetric entry point in a disinflationary environment.\n\nThe bear case assumes enterprise software spending decelerates and new artificial intelligence features fail to monetize. However, sustained revenue growth proves the underlying franchise remains resilient against macro headwinds. The thesis breaks if we see a sudden collapse in enterprise seat renewals.\n\nThe next test is the September 2 earnings print.\n\nPosting reasoning, not a recommendation."
+                }
+            ],
+            "data_unavailable_streak": 0
         }
     },
     "sleeve": {
         "ticker": "SPY",
-        "shares": 34.136428289811725
+        "shares": 31.16042605876943
     }
 }
