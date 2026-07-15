@@ -1,4 +1,4 @@
-"""GV AUTONOMOUS PORTFOLIO SYSTEM — v5.4  (single-file build)
+"""GV AUTONOMOUS PORTFOLIO SYSTEM — v5.4.1  (single-file build)
 =======================================================
 Based on:
   @theaiportfolios  — PWER ranking, 15-stock portfolio, opportunity cost engine
@@ -20,6 +20,30 @@ This file is organized in two parts:
   PART 2 — the live system: data fetching (yfinance), the AI agents
     (Gemini), Telegram notifications, persistence, and execution. This
     is the part that actually runs when you execute this script.
+
+v5.4.1 (hotfix — Luca caught it live: the system opened LLY_VALUE while
+already holding LLY_GROWTH).
+  ROOT CAUSE: pos_keys are TICKER_BUCKET, so the same ticker in two
+  buckets was two unrelated positions; nothing forbade it. v5.4's value
+  screener made the collision likely for the first time (a hypergrowth
+  name that is ALSO cheap vs its own history qualifies in BOTH
+  screeners); the PM saw LLY in the VALUE list and bought it. Evidence
+  in the wild: the trade note carried GROWTH tags (ticker-keyed cand
+  merge) and the order was crushed to $587 by the correlated-group
+  resize (LLY vs LLY, r=1.0) — the guard noticed, but only resizes.
+  FIX — one ticker, one bucket, at three layers:
+    + Phase 2d candidate hygiene: a ticker held in one bucket is scrubbed
+      from the OTHER bucket's candidate list before the committee/PM see
+      it (same-bucket presence kept — feeds add-on/dip-buy context).
+    + Execution backstop: a NEW position is deterministically BLOCKED
+      when the ticker is already held under the other bucket (same-cycle
+      double-buys included — the check reads the live book). Add-ons to
+      the same bucket untouched.
+    + PM Rule 16 states the law so the model routes extra exposure
+      through the held bucket instead of discovering blocked orders.
+  Existing duplicates are NOT auto-merged — deliberate: silently editing
+  live positions is riskier than a one-time manual merge (instructions
+  provided to Luca).
 
 v5.4 (this round — Luca's value definition wired in: "a value stock is a
 company whose price has detached below its fundamentals while it keeps
@@ -6922,7 +6946,13 @@ def run_portfolio_manager(
         "cash floor itself becomes spendable for such names, down to $0 cash. "
         "Do NOT hold capital back out of a false belief that cash is scarce; "
         "the only binding limits are the per-position, bucket and sector "
-        "concentration caps (all Python-enforced).\n\n"
+        "concentration caps (all Python-enforced).\n"
+        "16. ONE TICKER, ONE BUCKET (v5.4.1): never issue a BUY for a ticker "
+        "the book already holds in the OTHER strategy bucket — holding the "
+        "same name twice just doubles single-stock exposure around the "
+        "per-position cap. If you want more of a held name, add exposure "
+        "through the bucket it already lives in (the add-on / dip-buy rules "
+        "apply). Python blocks violations at execution regardless.\n\n"
         "Output ONLY valid JSON (no markdown fences):\n" + _ORDER_FORMAT
     )
     try:
@@ -8460,6 +8490,27 @@ def execute_agent_orders(orders: list, portfolio: dict, all_candidates: dict,
                     log_and_print(f"{YLW}[Exec] {ticker} not in screened candidates — skip.{RST}")
                     continue
 
+            # ── v5.4.1: ONE TICKER, ONE BUCKET (Luca) ─────────────────────
+            # pos_keys are TICKER_BUCKET, so LLY_GROWTH and LLY_VALUE were
+            # two different positions to the book — and once the v5.4 value
+            # screener started qualifying hypergrowth names that are ALSO
+            # cheap vs their own history, the PM could (and did, LLY) open
+            # the same ticker in the second bucket. That doubles single-name
+            # exposure while dodging the per-position cap (each tranche is
+            # capped separately) — the correlation guard only RESIZED the
+            # duplicate (self-correlation 1.0), it never blocked it. Hard
+            # deterministic rule: a NEW position is blocked when the ticker
+            # is already held in the other bucket. Add-ons to the SAME
+            # bucket (dip-buy flow) are untouched.
+            _other_pk = f"{ticker}_{BUCKET_V if bucket == BUCKET_G else BUCKET_G}"
+            if (f"{ticker}_{bucket}" not in portfolio["positions"]
+                    and _other_pk in portfolio["positions"]):
+                log_and_print(
+                    f"{YLW}[Exec] {ticker} BLOCKED — already held as "
+                    f"{_other_pk}; one ticker, one bucket. Exposure can only "
+                    f"be added through the held bucket's add-on rules.{RST}")
+                continue
+
             # ── v5.3: does this BUY unlock the cash-floor override? ──────
             # A max-conviction idea (HIGH + STRONG) may consume the regime
             # cash floor itself, all the way to $0 — the floor is dry-powder
@@ -8962,7 +9013,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     log_and_print(f"{CYN}{'='*60}{RST}")
-    log_and_print(f"{CYN}   GV PORTFOLIO SYSTEM v5.4 — INITIALIZING         {RST}")
+    log_and_print(f"{CYN}   GV PORTFOLIO SYSTEM v5.4.1 — INITIALIZING         {RST}")
     log_and_print(f"{CYN}   Strategist → Memory → Analyst(+EDGAR) → Advocate → EarningsPreview → ThesisReview → PM → RiskOfficer  {RST}")
     log_and_print(f"{CYN}   Model: {GEMINI_MODEL}                             {RST}")
     log_and_print(f"{CYN}{'='*60}{RST}")
@@ -9071,7 +9122,41 @@ if __name__ == "__main__":
         else:
             v_cands[_t] = _ng
 
+    # ── Phase 2d (v5.4.1): one-ticker-one-bucket candidate hygiene ────
+    # A ticker already held under one bucket must not appear in the OTHER
+    # bucket's candidate list — otherwise the PM is invited to open the
+    # same name twice (it did: LLY_GROWTH held, LLY offered again in the
+    # VALUE list). Scrub before the committee/PM ever see the lists; the
+    # execution-side guard is the deterministic backstop. Same-bucket
+    # presence is kept on purpose: it feeds the add-on / dip-buy context.
+    _held_bkts: dict = {}
+    for _pk in portfolio.get("positions", {}):
+        _tk, _, _bk = _pk.rpartition("_")
+        _held_bkts.setdefault(_tk, set()).add(_bk)
+    for _tk, _bks in _held_bkts.items():
+        if BUCKET_G in _bks and _tk in v_cands:
+            v_cands.pop(_tk)
+            log_and_print(f"{YLW}[Dedup] {_tk} dropped from VALUE candidates "
+                          f"— already held as {_tk}_{BUCKET_G}.{RST}")
+        if BUCKET_V in _bks and _tk in g_cands:
+            g_cands.pop(_tk)
+            log_and_print(f"{YLW}[Dedup] {_tk} dropped from GROWTH candidates "
+                          f"— already held as {_tk}_{BUCKET_V}.{RST}")
+
     all_cands = merge_candidates_dedup(g_cands, v_cands)
+
+    # ── v5.4.1b: make the PM's lists agree with the dedup verdict ──────
+    # For a NEW ticker qualifying in BOTH screeners, merge_candidates_
+    # dedup keeps the higher-scoring bucket in all_cands — but the PM was
+    # still shown the name under BOTH candidate lists, so it could order
+    # the LOSING bucket and execution would book a position carrying the
+    # other bucket's candidate data (the growth-tags-on-a-VALUE-note
+    # symptom). Drop the losing-bucket entry so PM view == execution view.
+    for _t in (set(g_cands) & set(v_cands)):
+        _win = all_cands[_t].get("bucket", BUCKET_G)
+        (v_cands if _win == BUCKET_G else g_cands).pop(_t, None)
+        log_and_print(f"{YLW}[Dedup] {_t} shown to PM as {_win} only "
+                      f"(higher-scoring bucket wins).{RST}")
     mines     = get_earnings_landmines(list(all_cands.keys()))
 
     # ── Phase 3: Position Monitoring (BEFORE PWER / AI) ──────────────
@@ -9427,7 +9512,7 @@ if __name__ == "__main__":
 
     _n_att, _n_grd = gemini_call_counts()
     log_and_print(f"{CYN}{'='*60}{RST}")
-    log_and_print(f"{CYN}   GV SYSTEM v5.4 CYCLE COMPLETE                   {RST}")
+    log_and_print(f"{CYN}   GV SYSTEM v5.4.1 CYCLE COMPLETE                   {RST}")
     log_and_print(f"{CYN}   Gemini API attempts this cycle: {_n_att} "
                   f"({_n_grd} grounded)                     {RST}")
     log_and_print(
