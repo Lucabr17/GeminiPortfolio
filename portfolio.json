@@ -1,5 +1,5 @@
 {
-    "cash_balance": 4000.6332370065893,
+    "cash_balance": 3970.9849290406673,
     "positions": {
         "MU_GROWTH": {
             "entry_price": 984.75,
@@ -13,7 +13,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 28.2,
-            "pwer_last_known": 19.8,
+            "pwer_last_known": 23.8,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -41,7 +41,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 24.0,
-            "pwer_last_known": 20.0,
+            "pwer_last_known": 32.2,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -69,7 +69,7 @@
             "tailwind_at_entry": "HEALTHCARE_BIOTECH",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 21.8,
-            "pwer_last_known": 13.3,
+            "pwer_last_known": 13.2,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -92,7 +92,7 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-07-06",
             "buying_thesis": "Capitalizing on a narrative gap. PWER score of 19.25 and MODERATE thesis strength with HIGH conviction. De-rated 44% despite 89% gross margins and 12.7% revenue growth.",
-            "high_watermark": 230.61000061035156,
+            "high_watermark": 235.30999755859375,
             "trim_count": 0,
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
@@ -125,7 +125,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 16.5,
-            "pwer_last_known": 11.1,
+            "pwer_last_known": 13.3,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -148,12 +148,12 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-07-07",
             "buying_thesis": "PWER 18.0, MODERATE thesis strength. Data Cloud and Agentforce adoption re-accelerating top-line growth, closing the 38% derating gap. Sized at Kelly adjusted max.",
-            "high_watermark": 171.22000122070312,
+            "high_watermark": 172.67999267578125,
             "trim_count": 0,
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.0,
-            "pwer_last_known": 11.8,
+            "pwer_last_known": 16.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -181,7 +181,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.8,
-            "pwer_last_known": 15.5,
+            "pwer_last_known": 20.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -209,7 +209,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 22.5,
-            "pwer_last_known": 16.0,
+            "pwer_last_known": 14.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -237,7 +237,7 @@
             "tailwind_at_entry": "HEALTHCARE_BIOTECH",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.9,
-            "pwer_last_known": 13.3,
+            "pwer_last_known": 13.2,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -260,12 +260,12 @@
             "strategy_bucket": "VALUE",
             "purchase_date": "2026-07-14",
             "buying_thesis": "PWER score 72.0, thesis MODERATE. Deep 89.3% historical discount with 12.06% FCF yield. Strong cash-flow compounder fitting the Value mandate.",
-            "high_watermark": 167.55999755859375,
+            "high_watermark": 172.67999267578125,
             "trim_count": 0,
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 17.5,
-            "pwer_last_known": 11.8,
+            "pwer_last_known": 16.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -280,10 +280,38 @@
                 }
             ],
             "data_unavailable_streak": 0
+        },
+        "APP_GROWTH": {
+            "entry_price": 434.4800109863281,
+            "shares": 9.900976223154856,
+            "allocated_capital": 4301.776258211696,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-07-16",
+            "buying_thesis": "PWER 30.75. Committee debate yielded MODERATE thesis strength. High conviction on 59% revenue growth and 88% gross margins despite 41% de-rating. Adding to Growth bucket.",
+            "high_watermark": 434.4800109863281,
+            "trim_count": 0,
+            "tailwind_at_entry": "UNCATEGORIZED",
+            "regime_at_entry": "BULL",
+            "pwer_at_entry": 30.8,
+            "pwer_last_known": 30.8,
+            "last_reunderwritten": null,
+            "forced_review_fail_streak": 0,
+            "dip_buy_count": 0,
+            "last_dip_buy_date": null,
+            "thesis_log": [
+                {
+                    "date": "2026-07-16",
+                    "action": "INITIAL_BUY",
+                    "usd": 4301.78,
+                    "price": 434.48,
+                    "thesis": "AppLovin is a new 4.3 percent position because the market is underpricing its advertising engine's ability to drive highly profitable expansion. \n\nThe company provides software to monetize mobile applications, leveraging proprietary algorithms to match users with relevant content. The market has discounted the stock, ignoring that their underlying efficiency flows directly into rapid revenue growth and free cash flow. \n\nThe bear case assumes shifts in mobile privacy policies will permanently impair ad-tech yields. However, the platform is actively disproving this by retaining 88 percent gross margins, proving the software overpowers privacy headwinds. While recent industry data hinting at an e-commerce advertising slowdown caused a selloff this week [1], the core thesis remains intact. The falsifier we are watching is any sustained margin compression signaling privacy changes are finally degrading pricing power. We test this resilience at their earnings print on August 5 [1].\n\nPosting reasoning, not a recommendation."
+                }
+            ],
+            "data_unavailable_streak": 0
         }
     },
     "sleeve": {
         "ticker": "SPY",
-        "shares": 36.21184956114995
+        "shares": 30.521141817962437
     }
 }
