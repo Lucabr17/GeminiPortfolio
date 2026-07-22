@@ -1,5 +1,5 @@
 {
-    "cash_balance": 3948.8109426620167,
+    "cash_balance": 3892.879268041377,
     "positions": {
         "MU_GROWTH": {
             "entry_price": 984.75,
@@ -13,7 +13,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 28.2,
-            "pwer_last_known": 22.8,
+            "pwer_last_known": 17.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -41,7 +41,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 24.0,
-            "pwer_last_known": 18.8,
+            "pwer_last_known": 18.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -53,62 +53,6 @@
                     "usd": 9600.0,
                     "price": 195.55,
                     "thesis": "Nvidia is a new 9.6 percent position in the Growth bucket, initiated because its sustained leadership in AI accelerators easily overrides fears of custom silicon competition.\n\nThe bear case centers on supply chain constraints and the threat of competitive custom silicon eroding its moat. Yet the quantitative evidence points the other way. Nvidia is delivering 85.2 percent revenue growth and a 114.3 percent return on equity, proving that demand and pricing power remain fully intact. Furthermore, heavy insider activity with 21 recent filings and strong momentum above the 200-day moving average signal high conviction from those closest to the business.\n\nThe next major test of this infrastructure premium will be the fiscal second-quarter earnings print on August 26.\n\nPosting reasoning, not a recommendation."
-                }
-            ],
-            "data_unavailable_streak": 0
-        },
-        "LLY_GROWTH": {
-            "entry_price": 1200.06005859375,
-            "shares": 3.9997998147065394,
-            "allocated_capital": 4800.0,
-            "strategy_bucket": "GROWTH",
-            "purchase_date": "2026-07-06",
-            "buying_thesis": "Diversifying into Healthcare Biotech. PWER score of 21.75 and MODERATE thesis strength with HIGH conviction. Unprecedented GLP-1 demand driving 55.5% revenue growth.",
-            "high_watermark": 1235.56005859375,
-            "trim_count": 1,
-            "tailwind_at_entry": "HEALTHCARE_BIOTECH",
-            "regime_at_entry": "BULL",
-            "pwer_at_entry": 21.8,
-            "pwer_last_known": 9.5,
-            "last_reunderwritten": "2026-07-21",
-            "forced_review_fail_streak": 0,
-            "dip_buy_count": 0,
-            "last_dip_buy_date": null,
-            "thesis_log": [
-                {
-                    "date": "2026-07-06",
-                    "action": "INITIAL_BUY",
-                    "usd": 9600.0,
-                    "price": 1200.06,
-                    "thesis": "Eli Lilly is a new 9.6 percent position, bought because its premium valuation is fully justified by GLP-1 demand driving sustained hypergrowth.\n\nThe market fears that manufacturing bottlenecks or unexpected regulatory hurdles will stall momentum. However, the underlying data refutes this concern. The company is delivering 55.5 percent revenue growth and a 107.5 percent return on equity, easily clearing our 30 percent hypergrowth threshold.\n\nFurthermore, internal conviction remains strong. We tracked 15 insider filings over the last 90 days, signaling heavy activity from those closest to the supply chain and regulatory pipeline.\n\nThe next test is the August 5 earnings print, where we will watch the prescription run rate for its newly approved oral GLP-1 pill.\n\nPosting reasoning, not a recommendation."
-                }
-            ],
-            "data_unavailable_streak": 0
-        },
-        "ADBE_GROWTH": {
-            "entry_price": 218.07000732421875,
-            "shares": 44.02256008423506,
-            "allocated_capital": 9600.0,
-            "strategy_bucket": "GROWTH",
-            "purchase_date": "2026-07-06",
-            "buying_thesis": "Capitalizing on a narrative gap. PWER score of 19.25 and MODERATE thesis strength with HIGH conviction. De-rated 44% despite 89% gross margins and 12.7% revenue growth.",
-            "high_watermark": 237.25,
-            "trim_count": 0,
-            "tailwind_at_entry": "UNCATEGORIZED",
-            "regime_at_entry": "BULL",
-            "pwer_at_entry": 19.2,
-            "pwer_last_known": 0.8,
-            "last_reunderwritten": null,
-            "forced_review_fail_streak": 0,
-            "dip_buy_count": 0,
-            "last_dip_buy_date": null,
-            "thesis_log": [
-                {
-                    "date": "2026-07-06",
-                    "action": "INITIAL_BUY",
-                    "usd": 9600.0,
-                    "price": 218.07,
-                    "thesis": "Adobe is a new 9.6 percent position for the Growth bucket, bought on the thesis that generative AI monetization will reverse its 43.6 percent drawdown.\n\nThe market fears that open-source and nimble AI-native design tools will disrupt the core franchise. That narrative is contradicted by the underlying economics, as the company continues to deliver 89.4 percent gross margins, a 10.63 percent free cash flow yield, and 12.7 percent revenue growth. Heavy insider activity across 25 recent filings provides a strong signal that the selloff is overdone.\n\nWe will monitor the September 10 earnings print to verify this continued fundamental strength.\n\nPosting reasoning, not a recommendation."
                 }
             ],
             "data_unavailable_streak": 0
@@ -125,7 +69,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 16.5,
-            "pwer_last_known": 12.0,
+            "pwer_last_known": 11.1,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -153,7 +97,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.0,
-            "pwer_last_known": 9.5,
+            "pwer_last_known": 13.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -181,7 +125,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.8,
-            "pwer_last_known": 16.5,
+            "pwer_last_known": 12.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -209,7 +153,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 22.5,
-            "pwer_last_known": 14.5,
+            "pwer_last_known": 16.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -237,7 +181,7 @@
             "tailwind_at_entry": "HEALTHCARE_BIOTECH",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.9,
-            "pwer_last_known": 9.5,
+            "pwer_last_known": 14.2,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -265,7 +209,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 17.5,
-            "pwer_last_known": 9.5,
+            "pwer_last_known": 13.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -293,7 +237,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 30.8,
-            "pwer_last_known": 16.0,
+            "pwer_last_known": 19.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -308,10 +252,38 @@
                 }
             ],
             "data_unavailable_streak": 0
+        },
+        "TSM_GROWTH": {
+            "entry_price": 421.2099914550781,
+            "shares": 2.310533534750552,
+            "allocated_capital": 973.2198104289514,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-07-22",
+            "buying_thesis": "PWER score 100 (19.0%), debate outcome: MODERATE thesis_strength. Redeploying capital into CYBERSECURITY per sector rotation directive. Hyper-growth compounder with 36% revenue growth and 40% ROE.",
+            "high_watermark": 421.2099914550781,
+            "trim_count": 0,
+            "tailwind_at_entry": "AI_SEMICONDUCTORS",
+            "regime_at_entry": "BULL",
+            "pwer_at_entry": 19.0,
+            "pwer_last_known": 19.0,
+            "last_reunderwritten": null,
+            "forced_review_fail_streak": 0,
+            "dip_buy_count": 0,
+            "last_dip_buy_date": null,
+            "thesis_log": [
+                {
+                    "date": "2026-07-22",
+                    "action": "INITIAL_BUY",
+                    "usd": 973.22,
+                    "price": 421.21,
+                    "thesis": "TSM is a new 1.0 percent position, initiated because its dominance in advanced node manufacturing translates the AI hardware buildout directly into structural free cash flow.\n\nThe company operates as the primary chokepoint for high-end semiconductor fabrication. Because major AI chip designers must rely on their foundries, they possess unmatched pricing power. This dynamic converts raw compute demand into a guaranteed toll bridge, driving 36.0 percent revenue growth and expanding margins without the cyclicality of legacy hardware.\n\nThe market discounts this cash generation by applying a severe risk premium tied to geopolitical tensions in Taiwan. We believe this geographic fear is mispriced relative to the inelasticity of customer demand, as designers have no viable alternative foundries. The thesis breaks if major customers successfully shift advanced node orders to competitors.\n\nThe next test of this pricing power is the October 15 earnings print.\n\nPosting reasoning, not a recommendation."
+                }
+            ],
+            "data_unavailable_streak": 0
         }
     },
     "sleeve": {
         "ticker": "SPY",
-        "shares": 36.833723340445935
+        "shares": 54.69177413756322
     }
 }
