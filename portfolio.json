@@ -1,5 +1,5 @@
 {
-    "cash_balance": 3892.879268041377,
+    "cash_balance": 3816.2557423162207,
     "positions": {
         "MU_GROWTH": {
             "entry_price": 984.75,
@@ -41,7 +41,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 24.0,
-            "pwer_last_known": 18.5,
+            "pwer_last_known": 18.8,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -69,7 +69,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 16.5,
-            "pwer_last_known": 11.1,
+            "pwer_last_known": 12.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -97,7 +97,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.0,
-            "pwer_last_known": 13.0,
+            "pwer_last_known": 11.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -125,7 +125,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.8,
-            "pwer_last_known": 12.0,
+            "pwer_last_known": 17.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -153,7 +153,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 22.5,
-            "pwer_last_known": 16.0,
+            "pwer_last_known": 12.8,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -176,12 +176,12 @@
             "strategy_bucket": "VALUE",
             "purchase_date": "2026-07-13",
             "buying_thesis": "Adding LLY to VALUE bucket. PWER score of 18.9 with MODERATE thesis strength. Aligns with the directive to add Healthcare/Biotech exposure. Offers 55.5% hypergrowth at a 21% historical discount.",
-            "high_watermark": 1181.8699951171875,
+            "high_watermark": 1185.8699951171875,
             "trim_count": 0,
             "tailwind_at_entry": "HEALTHCARE_BIOTECH",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.9,
-            "pwer_last_known": 14.2,
+            "pwer_last_known": 7.2,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -209,7 +209,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 17.5,
-            "pwer_last_known": 13.0,
+            "pwer_last_known": 11.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -237,7 +237,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 30.8,
-            "pwer_last_known": 19.0,
+            "pwer_last_known": 15.2,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -265,7 +265,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.0,
-            "pwer_last_known": 19.0,
+            "pwer_last_known": 17.1,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -280,10 +280,38 @@
                 }
             ],
             "data_unavailable_streak": 0
+        },
+        "ADBE_VALUE": {
+            "entry_price": 212.1699981689453,
+            "shares": 29.228524548800618,
+            "allocated_capital": 6201.416,
+            "strategy_bucket": "VALUE",
+            "purchase_date": "2026-07-23",
+            "buying_thesis": "PWER 11.0, thesis_strength MODERATE. Adding ADBE as a value play given its deep historical discount (86.5%) and strong FCF yield (10.93%), despite generative AI risks. Growth candidates skipped due to AI_SEMICONDUCTORS cluster already exceeding the max 2 positions limit.",
+            "high_watermark": 212.1699981689453,
+            "trim_count": 0,
+            "tailwind_at_entry": "UNCATEGORIZED",
+            "regime_at_entry": "BULL",
+            "pwer_at_entry": 11.0,
+            "pwer_last_known": 11.0,
+            "last_reunderwritten": null,
+            "forced_review_fail_streak": 0,
+            "dip_buy_count": 0,
+            "last_dip_buy_date": null,
+            "thesis_log": [
+                {
+                    "date": "2026-07-23",
+                    "action": "INITIAL_BUY",
+                    "usd": 6201.42,
+                    "price": 212.17,
+                    "thesis": "Adobe is a new 6.5 percent position, bought because the market is mispricing generative AI as a threat to its design software rather than a pricing lever. \n\nThe company provides essential creative tools, and its answer to commoditization fears is to embed its Firefly models directly into Creative Cloud, monetizing AI seamlessly to drive ARPU expansion. By upgrading users to higher subscription tiers, this integration flows directly into top-line growth. \n\nThe bear case claims the stock is a value trap, pointing to 12.7 percent growth as anemic while users supposedly abandon expensive subscriptions for cheaper alternatives. The strongest evidence the moat survives is Adobe's entrenched workflow ecosystem, which makes AI an upsell rather than a reason to churn. The falsifier we are watching is an actual decline in core subscription retention. \n\nThe next test is the Q3 earnings print on September 10.\n\nPosting reasoning, not a recommendation."
+                }
+            ],
+            "data_unavailable_streak": 0
         }
     },
     "sleeve": {
         "ticker": "SPY",
-        "shares": 54.69177413756322
+        "shares": 46.394620956706234
     }
 }
