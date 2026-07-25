@@ -1,4 +1,4 @@
-"""GV AUTONOMOUS PORTFOLIO SYSTEM — v5.4.1  (single-file build)
+"""GV AUTONOMOUS PORTFOLIO SYSTEM — v5.9  (single-file build)
 =======================================================
 Based on:
   @theaiportfolios  — PWER ranking, 15-stock portfolio, opportunity cost engine
@@ -20,6 +20,188 @@ This file is organized in two parts:
   PART 2 — the live system: data fetching (yfinance), the AI agents
     (Gemini), Telegram notifications, persistence, and execution. This
     is the part that actually runs when you execute this script.
+
+v5.9 (this round — the ADBE revolving door: full EXIT on a broken
+thesis, re-bought TWO DAYS later at ~the same price as ADBE_VALUE, 6.5%
+of NAV, arguing the same monetization mechanism. Two root causes, both
+fixed).
+  UNBOUNDED FCF-YIELD MATH (why the value screener fell in love): the
+  v5.4 cheapness formula for fcf_yield, (cur-avg)/avg, is unbounded —
+  ADBE's yield moving ~4% -> ~10.6% scored +165% "cheapness" alone and
+  dragged the blended discount to a fantasy 86% (the DEEP_HIST_
+  DISCOUNT_86PCT tag; reproduced exactly in tests). Fixed in multiple
+  space: the fcf leg is now (cur-avg)/cur — the discount on the implied
+  P/FCF multiple — symmetric with the other three metrics and bounded
+  below 100 like them. Same ADBE inputs now blend to ~61%: still deep,
+  no longer fantasy.
+  NO INSTITUTIONAL MEMORY (why nothing stopped the re-buy): nothing
+  recorded WHY a name was just exited. Now every FULL exit (mandatory
+  and agent paths) stamps portfolio["recent_exits"][TICKER] = {date,
+  pos_key, exit_price, why} — keyed by ticker so an ADBE_GROWTH exit
+  also blocks ADBE_VALUE. Three enforcement layers:
+    + Phase 2d scrub: cooldown tickers removed from every candidate pool
+      before the committee/PM see them (with the exit reason in the log).
+    + Deterministic execution guard: NEW positions in a cooldown ticker
+      are BLOCKED (red log line).
+    + PM Rule 21 states the law.
+  REENTRY_COOLDOWN_DAYS = 30; the one waiver is a genuine markdown:
+  price >= REENTRY_EARLY_DISCOUNT_PCT = 15 below our exit (a real crash
+  IS new information; a 2% wiggle is the trade the committee just
+  rejected). Stamps self-prune after cooldown + 15d.
+  ADBE replay under v5.9: exited 2d ago at $218.36, offered at $212.17
+  (-2.8%) -> scrubbed from candidates AND blocked at execution.
+
+v5.8 (this round — two lessons from the LLY/ADBE/TSM day).
+  VERDICT SEVERITY IS BINDING (the LLY escalation): Agent 6 returned
+  THESIS_WEAKENING -> TRIM_25 and the PM "escalated to a full exit" at
+  -3.1% after 16 days. The v5.7 sell backstop verified that a verdict
+  EXISTED but not that the sell RESPECTED it — any trim verdict was a
+  de-facto licence to liquidate. discretionary_sell_allowed() now parses
+  a severity cap from the verdict (TRIM_25 -> 25, TRIM_50 -> 50, EXIT*
+  -> 100; HOLD -> nothing) and from MECHANICAL status flags; a sell above
+  the cap is BLOCKED unless the PM independently justifies escalation via
+  sell_reason=FUNDAMENTAL_DETERIORATION with concrete evidence — naming
+  its own fundamental case is the one sanctioned escalation path.
+  Review-TRIGGER statuses (PWER_HARD_DRIFT etc.) now authorise nothing by
+  themselves: they force the review, and the review's verdict governs.
+  The Python-authored forced-review failsafe orders carry
+  sell_reason=REVIEW_FAILSAFE and keep their own lane. PM Rule 18
+  extended to state the law.
+  NO SUB-SCALE OPENERS (the TSM 1.0% position): MIN_NEW_POSITION_PCT =
+  0.02 — after all resizes/caps, a NEW position landing below 2% of NAV
+  is skipped with a log line (usually the residue of a correlation
+  resize; dust adds monitoring + Gemini cost without moving NAV).
+  Add-ons exempt. PM Rule 20 added.
+  MIN_HOLD deliberately UNTOUCHED: MIN_HOLD_DAYS=45 already exists; the
+  16-day exits pierced it through the fundamentals-fact-break carve-out,
+  which is correct design — a timer must not force holding a genuinely
+  broken thesis (ADBE). Churn control comes from severity discipline,
+  not longer timers.
+
+v5.7 (this round — Luca: "check for any possible improvement WITHOUT
+increasing the Gemini API usage". Four zero-Gemini upgrades; the Gemini
+call count is untouched).
+  BATCHED PRICE PREFETCH: prefetch_price_history() pulls 1y-daily +
+    5y-weekly closes for the WHOLE universe (plus SPY) via chunked,
+    threaded yf.download calls — replacing ~1,500 per-ticker history
+    requests per cycle, the #1 source of the throttled-day "0 qualified"
+    failure mode. Screeners consume the cache and keep their old
+    per-ticker fetch as an automatic fallback, so a partial batch
+    degrades to exactly the previous behaviour. auto_adjust=True matches
+    .history() defaults, so cache and fallback are numerically identical.
+    (.info has no batch API and stays per-ticker.)
+  DISCRETIONARY-SELL BACKSTOP (Rule 18 becomes law, not just prompt):
+    _ORDER_FORMAT gains sell_reason + fundamental_evidence; new pure
+    discretionary_sell_allowed() gates every PM SELL at execution — a
+    sell must ride a mechanical status flag, an Agent-6 EXIT*/TRIM*
+    verdict, an OPPORTUNITY_COST_SWAP paired with its BUY, or
+    FUNDAMENTAL_DETERIORATION with concrete evidence (>=15 chars).
+    Rotation / drawdown / macro-mood sells are BLOCKED with a red log
+    line. Mandatory Python exits never route through this branch and are
+    untouched. Backward compatible: flag/verdict-backed sells pass even
+    if the model omits sell_reason.
+  FMH PER-RUN MEMO: _FMH_CACHE dedupes fetch_multiple_history() across
+    the value Stage-2 shortlist and the NGap finalists (4 yfinance calls
+    per miss; overlap was refetched every cycle). Failures cached too —
+    no within-cycle retry storms. Cleared each cycle in main().
+  RET_15TD REUSE: growth + value candidates now carry ret_15td_pct
+    (computed from series already in hand); the v5.5 vertical entry gate
+    reuses it and skips its 2-month refetch for those names (NGap-sourced
+    cands still fetch — they carry no price series). PM Rule 17 tells the
+    model the field exists.
+  Deliberately NOT done (would trade correctness or Gemini cost):
+    PWER-score reuse for unchanged candidates (stale expected-return
+    risk), a 7-day XBRL disk cache (Actions runners are ephemeral;
+    correctness > cold-start speed), Phase-10 .info-light re-check.
+
+v5.6.1 (refinement — Luca: DEEP_CYCLICAL "strictly for memory or very
+high cyclical categories — unless they're at the BEGINNING of a new
+cycle").
+  MEMORY-SPECIFIC DETECTION: yfinance's taxonomy has no "Memory"
+  industry (MU and NVDA are both "Semiconductors"), so memory/storage is
+  now detected via MEMORY_SEMI_TICKERS {MU, WDC, STX, SNDK} plus
+  DRAM/NAND/flash-memory keywords in the business summary. Plain logic/
+  design semis (NVDA/AVGO-type) demoted DEEP_CYCLICAL -> CYCLICAL;
+  semiconductor EQUIPMENT stays DEEP (classic capex boom-bust); specialty
+  chemicals softened to CYCLICAL (commodity chems stay DEEP).
+  CYCLE-PHASE EXEMPTION: new pure classify_cycle_phase(pct_above_200d,
+  dd_from_3y_high, ret_12m) -> EARLY | MID | LATE | UNKNOWN, computed in
+  the growth screener (1y daily + 5y weekly already in hand) and tagged
+  EARLY_CYCLE / LATE_CYCLE on deep cyclicals. EARLY (>=30% below the
+  multi-year high AND <=25% above the 200d — emerging from a bust) LIFTS
+  the peak-cycle treatment: the Advocate's attack flips to false-dawn
+  risk, the Analyst must evidence the new cycle is real, and PM Rule 19
+  applies normal sizing. LATE (>=40% above 200d, or a >=80% 12-month run
+  near multi-year highs — MU's v5.4-era entry) = maximum caution.
+  UNKNOWN earns no exemption (no data, no exemption). Thresholds are
+  dials. Value/NGap-sourced candidates carry the cyclicality label but
+  not the phase (no price series in those paths) — phase reads UNKNOWN
+  there by construction.
+
+v5.6 (this round — two Luca directives after the MU-trim macro brief:
+"strategist directives may rotate, but trimming a holding requires a
+fundamental reason, not a drawdown" + "look at the TYPE of company: a
+cyclical like MU can top even while fundamentals are still growing").
+  STRATEGIST DIRECTIVES = NEW CAPITAL ONLY:
+    + The strategist prompt now carries a hard scope rule: rotation
+      directives steer where FRESH buys lean; they must never direct the
+      sale/trim of a held name on price action ('trim MU, 13.9% drawdown,
+      lock in capital' was exactly the disallowed pattern). If the
+      strategist believes a held name's FUNDAMENTALS deteriorated it must
+      name the concrete event, else omit sell language.
+    + PM Rule 18 closes the other end: a rotation directive is not
+      authority to sell a holding; sells/trims require the mechanical
+      pipeline (Rules 9-13) or a nameable fundamental deterioration, and
+      a price-action-only 'trim X' instruction is to be explicitly
+      IGNORED (noted in analysis_display).
+  COMPANY TYPE / PEAK-CYCLE AWARENESS:
+    + classify_cyclicality(sector, industry) — pure keyword classifier →
+      DEEP_CYCLICAL | CYCLICAL | SECULAR, attached (field + tag) by all
+      three screeners; growth candidates also carry pct_above_200d_sma
+      (price extension context). Judgment-informing only — never blocks.
+    + Advocate gains a PEAK-CYCLE TRAP attack vector (trailing numbers
+      look best AT the top; attack cycle position + extension); Analyst
+      Rule 5 requires cyclical pitches to state where the cycle sits and
+      why now is not the peak; PM Rule 19: smaller size / pullback entry
+      / pass for extended deep cyclicals — while the EXIT bar for held
+      cyclicals stays fundamental-only (consistent with v5.5).
+  Honest note: "semiconductor" keywords classify NVDA/AVGO DEEP_CYCLICAL
+  too — truthfully so; prune the keyword lists in classify_cyclicality
+  if a softer treatment for logic semis is preferred.
+
+v5.5 (this round — two lessons from the AXON round-trip, both Luca
+directives: "don't sell a stock just because the price fell while the
+thesis is intact" and "NEVER buy after a vertical run-up").
+  PRICE IS NOT A THESIS:
+    + PWER_HARD_DRIFT now requires PWER_DRIFT_CONFIRM_CYCLES = 2
+      consecutive cycles below the drift floor before forcing a review.
+      PWER is re-scored by a grounded model that reads the very headlines
+      a price move generates, so one violent print (AXON: 26.5 -> 5.4 in
+      six quiet days, no filings, no guidance) is now an observation, not
+      a verdict. Streak state on the position (pwer_drift_streak); resets
+      on recovery and on firing (a post-review re-fire needs two fresh
+      confirmations). Logged as "cycle 1/2 — awaiting confirmation".
+    + Agent 6 (thesis re-underwriting) gains a non-negotiable first rule:
+      a falling price, compressing multiple, drawdown, or headlines ABOUT
+      the price are never by themselves thesis-breaking; EXIT_RECOMMENDED
+      requires a nameable FUNDAMENTAL deterioration (filed numbers,
+      guidance, competitive/regulatory event, failed catalyst). For
+      NARRATIVE_GAP positions the rule is doubly binding: they were
+      bought INTO fear — further weakness on intact fundamentals WIDENS
+      the gap; selling it is buy-high-sell-low by construction.
+  NEVER CHASE VERTICALS:
+    + New deterministic entry gate: a NEW position in a name up >=
+      ENTRY_RUNUP_BLOCK_PCT = 25% over the last ENTRY_RUNUP_LOOKBACK_TD =
+      15 trading days is BLOCKED at execution (AXON's ~50%/2-week rally
+      would have been stopped cold). Add-ons/dip-buys exempt — their own
+      machinery already requires a pullback below the high-watermark
+      band. Missing history -> allowed with a log note (absence of data
+      is not evidence of a vertical). One extra 2-month history fetch per
+      NEW buy order. PM Rule 17 states the law so orders aren't wasted.
+  Unchanged: all other triggers (MOMENTUM_BREAKDOWN, PRICE_DRAWDOWN,
+  THESIS_FACT_BREAK, TIME_STOP, THESIS_PRICED_IN) still force REVIEWS as
+  before — the Agent-6 rule governs their verdicts; nothing was made
+  blind to genuine fundamental breaks.
 
 v5.4.1 (hotfix — Luca caught it live: the system opened LLY_VALUE while
 already holding LLY_GROWTH).
@@ -1735,6 +1917,43 @@ PWER_DRIFT_FLOOR     = 0.50   # current / entry PWER ratio below which thesis is
                                 # treated as broken enough to force a review
                                 # (e.g. entry=40%, current=18% → ratio=0.45 < 0.50)
 PWER_DRIFT_MIN_ENTRY = 15.0   # minimum entry PWER (%) for drift monitoring to activate;
+PWER_DRIFT_CONFIRM_CYCLES = 2 # v5.5 — the drift must hold this many CONSECUTIVE
+                              # cycles before the forced review fires. PWER is
+                              # re-scored by a grounded model that reads the very
+                              # headlines a price move generates, so one violent
+                              # print (AXON: 26.5 -> 5.4 in six quiet days) is an
+                              # observation, not a verdict.
+
+# ── v5.5: entry run-up gate (Luca: "NEVER buy after a vertical") ────────
+# AXON was bought after a ~50% two-week rally and round-tripped -7% in six
+# days when the multiple mean-reverted. A violent short-term run-up is the
+# single most predictable setup for a near-term correction, so NEW
+# positions in a name up >= ENTRY_RUNUP_BLOCK_PCT over the last
+# ENTRY_RUNUP_LOOKBACK_TD trading days are deterministically BLOCKED at
+# execution. Add-ons/dip-buys are exempt (their own machinery already
+# requires a pullback below the high-watermark band). If the run-up can't
+# be computed (no price history), the buy is allowed with a log note —
+# absence of data is not evidence of a vertical.
+ENTRY_RUNUP_BLOCK_PCT   = 25.0   # % gain that counts as "vertical"
+ENTRY_RUNUP_LOOKBACK_TD = 15     # trading days (~3 weeks)
+
+# ── v5.8: minimum meaningful NEW position (Luca: TSM opened at 1.0%) ────
+# A sub-scale opener adds monitoring surface, Gemini review cost and log
+# noise without the power to move NAV — usually the residue of a
+# correlation resize or bucket-room squeeze. If the sized value lands
+# below this share of NAV, the system PASSES instead of opening dust.
+# Add-ons are exempt (topping up an existing position is fine).
+MIN_NEW_POSITION_PCT = 0.02      # 2% of NAV floor for NEW positions
+
+# ── v5.9: revolving-door guard (the ADBE round-trip) ────────────────────
+# Full exit Tuesday, re-buy Thursday at ~the same price on ~the same
+# thesis: the committee has no memory of its own exits, so a freshly
+# exited name can sail straight back in through another screener. After
+# a FULL exit the TICKER (any bucket) is untouchable for the cooldown,
+# waived only at a genuine markdown vs our exit price — a real crash IS
+# new information; a 2% wiggle is not.
+REENTRY_COOLDOWN_DAYS      = 30    # calendar days after a full exit
+REENTRY_EARLY_DISCOUNT_PCT = 15.0  # early re-entry only >= this far below exit
                                 # speculative entries with very low initial PWER are excluded
                                 # because ratio comparison is noisy at small absolute values
 
@@ -2622,9 +2841,48 @@ def score_growth_candidate(ticker: str, info: dict, daily_close: "pd.Series",
     if sc < 45:
         return None
 
+    # v5.6.1 — company type + cycle phase: the committee must debate cycle
+    # position for cyclicals, so hand them the label, the 200d extension,
+    # and a mechanical EARLY/MID/LATE cycle read (Luca: the peak-cycle
+    # caution lifts at the BEGINNING of a new cycle).
+    _cyc = classify_cyclicality(sector, str(info.get("industry", "")),
+                                ticker=ticker,
+                                summary=str(info.get("longBusinessSummary", "")))
+    _pct200 = None
+    _dd3y   = None
+    _ret12m = None
+    _ret15  = None   # v5.7 — the exec vertical gate reuses this, no refetch
+    try:
+        if len(daily_close) >= 200:
+            _sma200 = float(daily_close.tail(200).mean())
+            if _sma200 > 0:
+                _pct200 = round((float(daily_close.iloc[-1]) / _sma200 - 1) * 100, 1)
+        if len(daily_close) >= 2:
+            _ret12m = round((float(daily_close.iloc[-1])
+                             / float(daily_close.iloc[0]) - 1) * 100, 1)
+        if len(daily_close) >= ENTRY_RUNUP_LOOKBACK_TD + 1:
+            _ret15 = round((float(daily_close.iloc[-1])
+                            / float(daily_close.iloc[-(ENTRY_RUNUP_LOOKBACK_TD + 1)])
+                            - 1) * 100, 1)
+        if weekly_close is not None and len(weekly_close) >= 52:
+            _hi3y = float(weekly_close.tail(156).max())
+            if _hi3y > 0:
+                _dd3y = round((1 - float(daily_close.iloc[-1]) / _hi3y) * 100, 1)
+    except Exception:
+        pass
+    _phase = (classify_cycle_phase(_pct200, _dd3y, _ret12m)
+              if _cyc != "SECULAR" else None)
+    if _cyc != "SECULAR":
+        tags.append(_cyc)
+        if _cyc == "DEEP_CYCLICAL" and _phase in ("EARLY", "LATE"):
+            tags.append(f"{_phase}_CYCLE")
+
     return {
         "bucket": BUCKET_G, "price": round(p, 2), "score": sc,
         "tags": " | ".join(tags), "sector": sector, "tailwinds": aligned,
+        "cyclicality": _cyc, "pct_above_200d_sma": _pct200,
+        "cycle_phase": _phase, "dd_from_3y_high_pct": _dd3y,
+        "ret_15td_pct": _ret15,
         "tailwind_excess": round(ts, 1), "rev_growth_pct": round(rg * 100, 1),
         "roe_pct": round(roe * 100, 1), "fcf_yield_pct": round(fcy * 100, 2),
         "rs_6m": round(rs6m, 1), "ema200w": round(ema200w, 2) if ema200w else "N/A",
@@ -2632,6 +2890,246 @@ def score_growth_candidate(ticker: str, info: dict, daily_close: "pd.Series",
         "rd_intensity_rising": _rd_rising,
         "gm_yoy_delta_pp":     _gm_yoy_delta,
     }
+
+
+MEMORY_SEMI_TICKERS = {"MU", "WDC", "STX", "SNDK"}   # v5.6.1 — yfinance has no
+                                                      # "Memory" industry (MU and
+                                                      # NVDA are both just
+                                                      # "Semiconductors"), so
+                                                      # memory is detected by
+                                                      # ticker + summary keywords
+
+
+def classify_cyclicality(sector: str, industry: str,
+                         ticker: str = "", summary: str = "") -> str:
+    """v5.6.1 (Luca: "strictly memory or VERY high cyclical categories").
+    A deep cyclical — memory is the archetype — posts its BEST trailing
+    fundamentals precisely at the cycle top, so 'fundamentals still
+    growing' is not a defense against having bought the peak.
+
+    DEEP_CYCLICAL = memory/storage semis (ticker set + DRAM/NAND summary
+    keywords, since yfinance's taxonomy can't tell MU from NVDA),
+    semiconductor EQUIPMENT (the classic capex boom-bust), and true
+    commodity cyclicals (steel/metals/mining, oil & gas, shipping,
+    airlines, auto manufacturers, homebuilders, commodity chemicals,
+    paper/lumber). Logic/design semis (NVDA/AVGO-type) are CYCLICAL —
+    cyclical, but not the boom-bust archetype. Specialty chemicals are
+    CYCLICAL, not DEEP. Judgment-informing only — never blocks a buy."""
+    s  = (sector or "").lower().strip()
+    i  = (industry or "").lower().strip()
+    tk = (ticker or "").upper().strip()
+    sm = (summary or "").lower()
+
+    # Memory/storage first — the archetype (Luca's MU case).
+    if tk in MEMORY_SEMI_TICKERS or any(
+            k in sm for k in ("dram", "nand", "flash memory")):
+        return "DEEP_CYCLICAL"
+
+    # Specialty chemicals escape DEEP (commodity chems stay).
+    if "chemical" in i and "specialty" in i:
+        return "CYCLICAL"
+
+    DEEP = ("semiconductor equipment", "steel", "aluminum", "copper",
+            "coal", "oil & gas", "oil, gas", "marine", "shipping",
+            "airline", "auto manufactur", "residential construction",
+            "homebuild", "agricultural inputs", "chemicals", "paper",
+            "lumber", "mining", "gold", "silver")
+    CYC = ("semiconductor", "bank", "capital markets", "insurance",
+           "travel", "resort", "casino", "apparel", "specialty retail",
+           "advertising", "staffing", "machinery", "trucking",
+           "railroad", "construction", "engineering", "aerospace",
+           "hotel", "restaurant", "furnishing", "auto parts")
+    if any(k in i for k in DEEP):
+        return "DEEP_CYCLICAL"
+    if s in ("energy", "basic materials"):
+        return "DEEP_CYCLICAL"
+    if any(k in i for k in CYC):
+        return "CYCLICAL"
+    if s in ("industrials", "consumer cyclical", "financial services"):
+        return "CYCLICAL"
+    return "SECULAR"
+
+
+def classify_cycle_phase(pct_above_200d: "float | None",
+                         dd_from_3y_high_pct: "float | None",
+                         ret_12m_pct: "float | None") -> str:
+    """v5.6.1 (Luca: "...unless they're at the BEGINNING of a new cycle").
+    Mechanical cycle-position proxy for cyclicals, from price structure:
+
+      EARLY — emerging from a bust: still >= 30% below its multi-year
+        high AND only modestly extended (<= 25% above the 200d SMA).
+        For a deep cyclical this is the ATTRACTIVE setup — the peak-cycle
+        caution is lifted and the debate shifts to 'is the upturn real'.
+      LATE  — extended: >= 40% above the 200d SMA, OR a >= 80% 12-month
+        run with the price at/near multi-year highs (<= 20% below).
+        MU at its v5.4-era entry (~+700% 12m, far above the 200d) lands
+        here — the exact setup Luca flagged.
+      MID   — neither. UNKNOWN — inputs unavailable; treated as
+        not-EARLY downstream (no data, no exemption).
+    Pure, backtestable; thresholds are dials, not laws."""
+    if pct_above_200d is None or dd_from_3y_high_pct is None:
+        return "UNKNOWN"
+    if dd_from_3y_high_pct >= 30 and pct_above_200d <= 25:
+        return "EARLY"
+    if pct_above_200d >= 40:
+        return "LATE"
+    if (ret_12m_pct is not None and ret_12m_pct >= 80
+            and dd_from_3y_high_pct <= 20):
+        return "LATE"
+    return "MID"
+
+
+def _sell_severity_cap(text: str) -> "int | None":
+    """v5.8 — parse the maximum sell_pct a verdict/status authorises.
+    EXIT-class -> 100, TRIM_50 -> 50, TRIM_25 -> 25, none -> None."""
+    t = (text or "").upper()
+    if any(k in t for k in ("EXIT", "MANDATORY_SELL", "TAKE_PROFIT",
+                            "THESIS_TIME_STOP", "DATA_UNAVAILABLE")):
+        return 100
+    if "TRIM_50" in t:
+        return 50
+    if "TRIM_25" in t:
+        return 25
+    return None
+
+
+def discretionary_sell_allowed(order: dict, pk: str, risk_matrix: dict,
+                               thesis_reviews: list, orders: list) -> tuple:
+    """v5.7 backstop, v5.8 severity-capped after the LLY escalation:
+    Agent 6 said TRIM_25 (thesis WEAKENING, not broken) and the PM
+    "escalated to a full exit" — the v5.7 guard checked THAT a verdict
+    existed, not that the sell RESPECTED it, so any trim verdict was a
+    de-facto licence to liquidate. Now the verdict's severity is binding:
+
+      1. Agent-6 verdict for this pos_key -> sell_pct must be <= the
+         verdict's cap (TRIM_25 -> 25, TRIM_50 -> 50, EXIT* -> 100).
+         A HOLD verdict authorises nothing.
+      2. MECHANICAL status flags carry their own caps the same way
+         (TRIM_25_PRE_EARNINGS -> 25, TRIM_50 band -> 50, TAKE_PROFIT /
+         TIME_STOP / DATA_UNAVAILABLE -> 100). Review-TRIGGER statuses
+         (PWER_HARD_DRIFT, MOMENTUM_BREAKDOWN, PRICE_DRAWDOWN,
+         THESIS_FACT_BREAK, THESIS_PRICED_IN) authorise NOTHING by
+         themselves — they force a review, and the review's verdict is
+         what governs.
+      3. sell_reason == REVIEW_FAILSAFE — the Python-authored 50% de-risk
+         issued only after FORCED_REVIEW_FAILSAFE_STREAK failed reviews.
+      4. sell_reason == OPPORTUNITY_COST_SWAP with a paired BUY.
+      5. sell_reason == FUNDAMENTAL_DETERIORATION with concrete evidence
+         (>= 15 chars) — the ONE sanctioned way to sell MORE than a
+         verdict allows: escalation must name its own fundamental case.
+    Anything else is BLOCKED. Pure: no clock, no network, backtestable."""
+    _TRIGGERS = ("PWER_HARD_DRIFT", "MOMENTUM_BREAKDOWN", "PRICE_DRAWDOWN",
+                 "THESIS_FACT_BREAK", "THESIS_PRICED_IN")
+    try:
+        sell_pct = float((order or {}).get("sell_pct", 100) or 100)
+    except (TypeError, ValueError):
+        sell_pct = 100.0
+    cap_notes = []
+
+    for r in (thesis_reviews or []):
+        if str(r.get("pos_key", "")) == pk:
+            rec = str(r.get("recommendation", "")).upper()
+            cap = _sell_severity_cap(rec)
+            if cap is not None:
+                if sell_pct <= cap:
+                    return True, f"Agent-6 verdict {rec} (authorises up to {cap}%)"
+                cap_notes.append(f"Agent-6 verdict {rec} caps this sell at "
+                                 f"{cap}% but the order sells {sell_pct:.0f}%")
+
+    status = str((risk_matrix or {}).get(pk, {}).get("status", "") or "")
+    if status and not any(t in status.upper() for t in _TRIGGERS):
+        cap = _sell_severity_cap(status)
+        if cap is not None:
+            if sell_pct <= cap:
+                return True, f"status flag authorises up to {cap}% ({status[:50]})"
+            cap_notes.append(f"status flag caps this sell at {cap}% but the "
+                             f"order sells {sell_pct:.0f}%")
+
+    reason = str((order or {}).get("sell_reason", "")).upper().strip()
+    if reason == "REVIEW_FAILSAFE":
+        return True, "forced-review failsafe (Python-authored de-risk)"
+    if reason == "OPPORTUNITY_COST_SWAP":
+        if any(str(o.get("action", "")).upper() == "BUY" for o in (orders or [])):
+            return True, "opportunity-cost swap (paired BUY present)"
+        return False, "OPPORTUNITY_COST_SWAP claimed but no BUY in the order list"
+    if reason == "FUNDAMENTAL_DETERIORATION":
+        ev = str((order or {}).get("fundamental_evidence", "")).strip()
+        if len(ev) >= 15:
+            return True, f"fundamental deterioration cited: {ev[:60]}"
+        return False, "FUNDAMENTAL_DETERIORATION claimed without concrete evidence"
+
+    if cap_notes:
+        return False, (cap_notes[0] + " — escalation beyond a verdict requires "
+                       "sell_reason=FUNDAMENTAL_DETERIORATION with evidence")
+    return False, (f"no authorising verdict or flag, and sell_reason="
+                   f"'{reason or 'MISSING'}' is not a valid discretionary reason "
+                   f"(rotation/drawdown/mood sells are Python-blocked)")
+
+
+def _record_full_exit(portfolio: dict, pk: str, exit_price: float, why: str) -> None:
+    """v5.9 — institutional memory: stamp every FULL exit so the
+    revolving-door guard can see it. Keyed by TICKER (not pos_key) on
+    purpose: an ADBE_GROWTH exit must also block an ADBE_VALUE re-entry."""
+    try:
+        tk = pk.rsplit("_", 1)[0]
+        portfolio.setdefault("recent_exits", {})[tk] = {
+            "date": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
+            "pos_key": pk,
+            "exit_price": round(float(exit_price or 0), 4),
+            "why": str(why or "")[:160],
+        }
+    except Exception:
+        pass
+
+
+def _prune_recent_exits(portfolio: dict, today_iso: str) -> None:
+    """Drop exit stamps older than the cooldown (+15d grace) so the file
+    never accumulates history it can no longer act on."""
+    ex = portfolio.get("recent_exits")
+    if not isinstance(ex, dict):
+        return
+    keep = REENTRY_COOLDOWN_DAYS + 15
+    for tk in list(ex):
+        try:
+            age = (datetime.strptime(today_iso, "%Y-%m-%d").date()
+                   - datetime.strptime(str(ex[tk].get("date", "")),
+                                       "%Y-%m-%d").date()).days
+            if age > keep:
+                del ex[tk]
+        except Exception:
+            del ex[tk]
+
+
+def reentry_blocked(recent_exits: dict, ticker: str, today_iso: str,
+                    current_price: float) -> tuple:
+    """v5.9 pure core of the revolving-door guard: (blocked, info).
+    Blocked when the ticker was FULLY exited fewer than REENTRY_COOLDOWN_
+    DAYS ago, unless current_price sits >= REENTRY_EARLY_DISCOUNT_PCT
+    below our exit price (a genuine markdown is new information; a 2%
+    wiggle is the same trade the committee just rejected). Unknown ticker
+    or unparseable dates -> not blocked (no data, no accusation)."""
+    rec = (recent_exits or {}).get(ticker)
+    if not rec:
+        return False, ""
+    try:
+        age = (datetime.strptime(today_iso, "%Y-%m-%d").date()
+               - datetime.strptime(str(rec.get("date", "")),
+                                   "%Y-%m-%d").date()).days
+    except Exception:
+        return False, ""
+    if age >= REENTRY_COOLDOWN_DAYS:
+        return False, ""
+    xp = float(rec.get("exit_price", 0) or 0)
+    if (xp > 0 and current_price and current_price > 0
+            and current_price <= xp * (1 - REENTRY_EARLY_DISCOUNT_PCT / 100.0)):
+        return False, (f"cooldown waived — ${current_price:,.2f} is >= "
+                       f"{REENTRY_EARLY_DISCOUNT_PCT:.0f}% below the "
+                       f"${xp:,.2f} exit")
+    return True, (f"fully exited {age}d ago as {rec.get('pos_key')} at "
+                  f"${xp:,.2f} ({str(rec.get('why', ''))[:60]}) — re-entry "
+                  f"blocked for {REENTRY_COOLDOWN_DAYS - age} more day(s) "
+                  f"unless price falls {REENTRY_EARLY_DISCOUNT_PCT:.0f}% "
+                  f"below that exit")
 
 
 def historical_valuation_discount(hist: "dict | None") -> "dict | None":
@@ -2661,7 +3159,13 @@ def historical_valuation_discount(hist: "dict | None") -> "dict | None":
         if cur <= 0 or avg <= 0:
             continue
         if m == "fcf_yield":
-            per[m] = (cur - avg) / avg * 100.0
+            # v5.9 — multiple-space math: the old (cur-avg)/avg form was
+            # UNBOUNDED (a yield going 4% -> 10.6% scored +165% "cheapness"
+            # and dragged ADBE's blend to a fantasy 86%, tag DEEP_HIST_
+            # DISCOUNT_86PCT). On the implied P/FCF multiple the discount
+            # is (cur-avg)/cur — symmetric with the other three metrics
+            # and bounded below 100 like them.
+            per[m] = (cur - avg) / cur * 100.0
         else:
             per[m] = (avg - cur) / avg * 100.0
     if len(per) < VALUE_HIST_MIN_METRICS:
@@ -2800,9 +3304,16 @@ def score_value_candidate(ticker: str, info: dict,
     if sc < 35:
         return None
 
+    _cyc = classify_cyclicality(info.get("sector", ""), str(info.get("industry", "")),
+                                ticker=ticker,
+                                summary=str(info.get("longBusinessSummary", "")))
+    if _cyc != "SECULAR":
+        tags.append(_cyc)
+
     return {
         "bucket": BUCKET_V, "price": round(p, 2), "score": round(sc, 1),
         "tags": " | ".join(tags),
+        "cyclicality": _cyc,
         "sector": info.get("sector", "Unknown"),
         "hist_discount_pct": d,
         "hist_metrics": disc["per_metric"],
@@ -2909,10 +3420,17 @@ def narrative_gap_candidate(ticker: str, info: dict,
     if _is_cheap_vs_hist:
         tags.append(f"VALUATION_BELOW_HIST_{int(_disc['blended_discount_pct'])}PCT")
 
+    _cyc = classify_cyclicality(info.get("sector", ""), str(info.get("industry", "")),
+                                ticker=ticker,
+                                summary=str(info.get("longBusinessSummary", "")))
+    if _cyc != "SECULAR":
+        tags.append(_cyc)
+
     return {
         "bucket": (BUCKET_V if _is_cheap_vs_hist else BUCKET_G),
         "hist_discount_pct": (round(_disc["blended_discount_pct"], 1)
                               if _is_cheap_vs_hist else None),
+        "cyclicality": _cyc,
         "price": round(p, 2), "score": sc, "tags": " | ".join(tags),
         "sector": info.get("sector", "Unknown"),
         "narrative_gap": True,
@@ -4534,8 +5052,81 @@ def get_earnings_landmines(tickers: list, days_ahead: int = 14) -> dict:
 # ============================================================
 # 8. THREE-BUCKET SCREENERS
 # ============================================================
+# ── v5.7: batched price prefetch (zero-Gemini efficiency round) ────────
+# The growth + value screeners used to make ~1,500 per-ticker yfinance
+# history calls per cycle (1y daily x2 pools + 5y weekly), which is both
+# slow and the #1 source of the throttled-day "0 qualified" failure mode
+# the SCREENER_FETCH_FAIL_WARN_RATIO warning exists for. yf.download can
+# pull the SAME data for the whole universe in a handful of batched,
+# threaded requests. The screeners consume the cache and keep their old
+# per-ticker fetch as an automatic FALLBACK, so a partial/failed batch
+# degrades to exactly the previous behaviour — never worse, usually ~2
+# orders of magnitude fewer HTTP round-trips. (.info has no batch API and
+# stays per-ticker; the sleeps in the loops pace those calls.)
+_PREFETCH_CHUNK = 100   # tickers per yf.download call — robust vs one mega-call
+
+
+def _extract_close(df, ticker: str):
+    """Close Series for `ticker` out of a yf.download frame — handles the
+    MultiIndex (many tickers) and flat (single ticker) column layouts.
+    Returns a dropna'd Series or None."""
+    try:
+        if df is None or df.empty:
+            return None
+        if isinstance(df.columns, pd.MultiIndex):
+            if ticker in df.columns.get_level_values(0):
+                s = df[ticker]["Close"].dropna()
+            else:
+                return None
+        else:
+            s = df["Close"].dropna()
+        return s if len(s) else None
+    except Exception:
+        return None
+
+
+def prefetch_price_history(tickers: list) -> dict:
+    """One batched pass over the universe → {"daily": {t: Series(1y,1d)},
+    "weekly": {t: Series(5y,1wk)}}. auto_adjust=True to match what
+    yf.Ticker().history() returns by default, so cache and fallback are
+    numerically identical. Any chunk that fails is simply absent from the
+    cache — the screeners' per-ticker fallback covers it."""
+    out = {"daily": {}, "weekly": {}}
+    uniq = list(dict.fromkeys(t for t in tickers if t))
+    if not uniq:
+        return out
+    log_and_print(f"{CYN}[Prefetch] batched download for {len(uniq)} tickers "
+                  f"({(len(uniq) + _PREFETCH_CHUNK - 1) // _PREFETCH_CHUNK} "
+                  f"chunks x 2 timeframes)...{RST}")
+    for i in range(0, len(uniq), _PREFETCH_CHUNK):
+        chunk = uniq[i:i + _PREFETCH_CHUNK]
+        for key, kw in (("daily",  dict(period="1y")),
+                        ("weekly", dict(period="5y", interval="1wk"))):
+            try:
+                df = yf.download(chunk, group_by="ticker", auto_adjust=True,
+                                 threads=True, progress=False, **kw)
+                for t in chunk:
+                    s = _extract_close(df, t) if len(chunk) > 1 else _extract_close(df, t)
+                    if s is not None:
+                        out[key][t] = s
+            except Exception as e:
+                log_and_print(f"{YLW}[Prefetch] {key} chunk "
+                              f"{i//_PREFETCH_CHUNK + 1} failed ({e}) — "
+                              f"those tickers fall back to per-ticker "
+                              f"fetches.{RST}")
+    log_and_print(f"{GRN}[Prefetch] cached daily={len(out['daily'])} "
+                  f"weekly={len(out['weekly'])} of {len(uniq)}.{RST}")
+    return out
+
+
+# v5.7 — per-run memo for fetch_multiple_history(): the value screener's
+# Stage-2 shortlist and the NGap finalists frequently overlap, and each
+# call costs 4 yfinance requests. Cleared at the top of every cycle.
+_FMH_CACHE: dict = {}
+
+
 def run_growth_screener(tickers: list, active_tailwinds: dict,
-                        sector_map: dict) -> dict:
+                        sector_map: dict, price_cache: "dict | None" = None) -> dict:
     """
     BUCKET G — Quality growth stocks aligned with confirmed macro tailwinds.
     Every qualifying stock must map to at least one active tailwind cluster.
@@ -4551,8 +5142,13 @@ def run_growth_screener(tickers: list, active_tailwinds: dict,
     candidates: dict = {}
     _fetch_fail = 0   # v5.3 — throttling visibility
 
+    _pc_d = (price_cache or {}).get("daily",  {})
+    _pc_w = (price_cache or {}).get("weekly", {})
+
     try:
-        spy   = yf.Ticker("SPY").history(period="1y")["Close"]
+        spy = _pc_d.get("SPY")
+        if spy is None:
+            spy = yf.Ticker("SPY").history(period="1y")["Close"]
         spy6m = (spy.iloc[-1] / spy.iloc[-126] - 1) * 100 if len(spy) >= 126 else 0.0
     except Exception:
         spy6m = 0.0
@@ -4560,13 +5156,22 @@ def run_growth_screener(tickers: list, active_tailwinds: dict,
     for ticker in tickers:
         try:
             t    = yf.Ticker(ticker)
-            hd   = t.history(period="1y")
             info = t.info
-            if hd.empty or len(hd) < 200:
+
+            # v5.7 — prefetched series first, per-ticker fetch as fallback.
+            daily_close = _pc_d.get(ticker)
+            if daily_close is None:
+                hd = t.history(period="1y")
+                daily_close = None if (hd is None or hd.empty) else hd["Close"].dropna()
+            if daily_close is None or len(daily_close) < 200:
                 continue
 
-            hw = t.history(period="5y", interval="1wk")
-            weekly_close = hw["Close"] if len(hw) >= 200 else None
+            weekly_close = _pc_w.get(ticker)
+            if weekly_close is None:
+                hw = t.history(period="5y", interval="1wk")
+                weekly_close = hw["Close"].dropna() if (hw is not None and not hw.empty) else None
+            if weekly_close is not None and len(weekly_close) < 200:
+                weekly_close = None
 
             # v4.7: fetch EDGAR financials for R&D intensity + GM trajectory.
             # _XBRL_CACHE ensures this is a no-op if the Analyst Agent already
@@ -4575,7 +5180,7 @@ def run_growth_screener(tickers: list, active_tailwinds: dict,
             time.sleep(0.12)   # SEC fair-use rate limit
 
             cand = score_growth_candidate(
-                ticker, info, hd["Close"], active_tailwinds, sector_map,
+                ticker, info, daily_close, active_tailwinds, sector_map,
                 spy6m, weekly_close=weekly_close, edgar=edgar)
             if cand:
                 candidates[ticker] = cand
@@ -4617,7 +5222,13 @@ def fetch_multiple_history(ticker: str, info: dict) -> "dict | None":
     current sharesOutstanding. Current-side values come from info.
     Any metric with missing pieces is simply omitted — the pure layer
     requires >= VALUE_HIST_MIN_METRICS to make a claim. Returns None
-    when statements/prices are unusable (fewer than 2 fiscal years)."""
+    when statements/prices are unusable (fewer than 2 fiscal years).
+
+    v5.7: memoised per run in _FMH_CACHE (value Stage-2 and the NGap
+    finalists overlap often; each miss costs 4 yfinance calls). Failures
+    are cached too — one transient miss is not retried within a cycle."""
+    if ticker in _FMH_CACHE:
+        return _FMH_CACHE[ticker]
     def _row(df, names):
         for n in names:
             if n in df.index:
@@ -4631,6 +5242,7 @@ def fetch_multiple_history(ticker: str, info: dict) -> "dict | None":
         cfs = t.cashflow
         px  = t.history(period="5y")["Close"]
         if inc is None or inc.empty or px is None or px.empty:
+            _FMH_CACHE[ticker] = None
             return None
         px = px.copy()
         try:                                   # tz-naive for asof lookups
@@ -4706,6 +5318,7 @@ def fetch_multiple_history(ticker: str, info: dict) -> "dict | None":
                     fy_h.append(fcf / mcap_y)
 
         if len(rev_fy) < 2:
+            _FMH_CACHE[ticker] = None
             return None
 
         out: dict = {"years": len(cols), "rev_fy": rev_fy, "ni_fy": ni_fy}
@@ -4722,12 +5335,15 @@ def fetch_multiple_history(ticker: str, info: dict) -> "dict | None":
             out["ps"] = {"current": cur_ps, "hist_avg": sum(ps_h) / len(ps_h)}
         if len(fy_h) >= 2 and cur_fcy > 0:
             out["fcf_yield"] = {"current": cur_fcy, "hist_avg": sum(fy_h) / len(fy_h)}
+        _FMH_CACHE[ticker] = out
         return out
     except Exception:
+        _FMH_CACHE[ticker] = None
         return None
 
 
-def run_value_screener(tickers: list) -> dict:
+def run_value_screener(tickers: list,
+                       price_cache: "dict | None" = None) -> dict:
     """
     BUCKET V (v5.4) — quality businesses whose price has detached below
     their OWN multi-year valuation history while fundamentals keep
@@ -4749,13 +5365,31 @@ def run_value_screener(tickers: list) -> dict:
     provisional: dict = {}
     _fetch_fail = 0   # v5.3 — throttling visibility
 
+    _pc_d = (price_cache or {}).get("daily", {})
+
     for ticker in tickers:
         try:
             t    = yf.Ticker(ticker)
             info = t.info
-            hd   = t.history(period="1y")
-            if hd.empty or len(hd) < 100:
+
+            # v5.7 — prefetched series first, per-ticker fetch as fallback
+            # (used for the liquidity gate and the 15-trading-day run-up
+            # that the execution vertical gate reuses without refetching).
+            daily_close = _pc_d.get(ticker)
+            if daily_close is None:
+                hd = t.history(period="1y")
+                daily_close = None if (hd is None or hd.empty) else hd["Close"].dropna()
+            if daily_close is None or len(daily_close) < 100:
                 continue
+            _ret15 = None
+            try:
+                if len(daily_close) >= ENTRY_RUNUP_LOOKBACK_TD + 1:
+                    _ret15 = round(
+                        (float(daily_close.iloc[-1])
+                         / float(daily_close.iloc[-(ENTRY_RUNUP_LOOKBACK_TD + 1)])
+                         - 1) * 100, 1)
+            except Exception:
+                _ret15 = None
 
             # Anomaly logging needs log_and_print, so it stays here even
             # though score_value_candidate independently re-checks
@@ -4777,7 +5411,8 @@ def run_value_screener(tickers: list) -> dict:
 
             cand = score_value_candidate(ticker, info)     # Stage 1
             if cand:
-                provisional[ticker] = (cand, info)
+                cand["ret_15td_pct"] = _ret15   # v5.7 — exec vertical gate reuses this
+                provisional[ticker] = (cand, info, _ret15)
             time.sleep(0.04)
         except Exception:
             _fetch_fail += 1
@@ -4803,7 +5438,7 @@ def run_value_screener(tickers: list) -> dict:
         f"{len(shortlist)}: {[t for t, _ in shortlist]}{RST}")
 
     candidates: dict = {}
-    for ticker, (_prov, info) in shortlist:
+    for ticker, (_prov, info, _ret15) in shortlist:
         hist = fetch_multiple_history(ticker, info)
         time.sleep(0.06)
         if hist is None:
@@ -4816,6 +5451,7 @@ def run_value_screener(tickers: list) -> dict:
             continue
         final = score_value_candidate(ticker, info, hist=hist)   # Stage 2
         if final:
+            final["ret_15td_pct"] = _ret15   # v5.7 — exec vertical gate reuses this
             candidates[ticker] = final
         else:
             _d = historical_valuation_discount(hist)
@@ -5297,23 +5933,46 @@ def evaluate_open_positions(portfolio: dict, regime: dict = None) -> tuple:
                 # drift and momentum get their turn on later cycles).
 
                 # v4.13: PWER Hard Drift — an instant MANDATORY_SELL
-                # through v4.12; now a FORCED, cooldown-bypassing thesis
-                # review instead (see the v4.13 constants block).
+                # through v4.12; a FORCED thesis review since. v5.5: the
+                # trigger now needs TWO CONSECUTIVE cycles below the floor
+                # before it fires. AXON showed why: PWER is re-scored by a
+                # grounded model that reads the same headlines the price
+                # move generated, so a violent-but-fundamentals-free swing
+                # (26.5 -> 5.4 in six quiet days) could single-handedly
+                # force a review and cascade into an exit. One noisy print
+                # is now an observation; only a CONFIRMED drift forces the
+                # review. Recovery above the floor resets the streak, and
+                # firing resets it too (a post-review re-fire needs two
+                # fresh confirmations, not one lingering one).
                 if not is_mand and force_review is None:
                     _p_entry = float(pos.get("pwer_at_entry", 0) or 0)
                     _p_last  = float(pos.get("pwer_last_known", 0) or 0)
-                    if (_p_entry >= PWER_DRIFT_MIN_ENTRY
-                            and _p_last  >  0
-                            and _p_last  <  _p_entry * PWER_DRIFT_FLOOR):
+                    _drifted = (_p_entry >= PWER_DRIFT_MIN_ENTRY
+                                and _p_last  >  0
+                                and _p_last  <  _p_entry * PWER_DRIFT_FLOOR)
+                    _streak  = int(pos.get("pwer_drift_streak", 0) or 0)
+                    if _drifted and _streak >= PWER_DRIFT_CONFIRM_CYCLES - 1:
                         _ratio_pct = round(_p_last / _p_entry * 100, 0)
                         status = (
                             f"PWER_HARD_DRIFT: PWER fell from {_p_entry}% at "
-                            f"entry to {_p_last}% this cycle ({_ratio_pct:.0f}% "
-                            f"of entry, below {int(PWER_DRIFT_FLOOR*100)}% floor) "
-                            f"— forcing immediate thesis review"
+                            f"entry to {_p_last}% ({_ratio_pct:.0f}% of entry, "
+                            f"below {int(PWER_DRIFT_FLOOR*100)}% floor) for "
+                            f"{_streak + 1} consecutive cycles — forcing "
+                            f"thesis review"
                         )
                         force_review = {"reason": "PWER_HARD_DRIFT", "bypass_min_hold": True}
+                        portfolio["positions"][pk]["pwer_drift_streak"] = 0
                         log_and_print(f"{YLW}[PwrDrift] {ticker}: {status}{RST}")
+                    elif _drifted:
+                        portfolio["positions"][pk]["pwer_drift_streak"] = _streak + 1
+                        log_and_print(
+                            f"{YLW}[PwrDrift] {ticker}: PWER {_p_last}% vs "
+                            f"{_p_entry}% at entry is below the drift floor — "
+                            f"cycle {_streak + 1}/{PWER_DRIFT_CONFIRM_CYCLES}, "
+                            f"awaiting confirmation before forcing a review "
+                            f"(price noise must persist to count).{RST}")
+                    elif _streak:
+                        portfolio["positions"][pk]["pwer_drift_streak"] = 0
 
                 # v4.13: "no buying volume" — momentum/sponsorship
                 # breakdown. Always bypasses MIN_HOLD_DAYS (Luca: "those
@@ -6058,6 +6717,10 @@ _ORDER_FORMAT = (
     '"strategy_bucket":"GROWTH|VALUE",'
     '"transaction_value_usd":5000,'
     '"sell_pct":100,'
+    '"sell_reason":"SELL only — STATUS_FLAG|REVIEW_VERDICT|'
+    'OPPORTUNITY_COST_SWAP|FUNDAMENTAL_DETERIORATION",'
+    '"fundamental_evidence":"SELL+FUNDAMENTAL_DETERIORATION only — '
+    'name the concrete event",'
     '"analysis_display":"rationale — cite PWER score AND debate outcome"}'
     "]}"
 )
@@ -6124,6 +6787,16 @@ def run_global_strategist(regime: dict, risk_matrix: dict,
         "Write a concise 3-paragraph macro brief covering:\n"
         "  1. Regime characterisation and what it means for equity risk.\n"
         "  2. Specific sector rotation directives (name sectors to add AND reduce).\n"
+        "     HARD SCOPE RULE (v5.6): rotation directives steer NEW capital "
+        "only — where fresh buys should lean. NEVER direct the sale or trim "
+        "of an existing holding because of its price action: a drawdown, a "
+        "pullback, 'locking in capital', or sector mood are not sell "
+        "reasons (the committee's exit pipeline enforces 'price is not a "
+        "thesis'). If you believe a HELD name's FUNDAMENTALS have "
+        "deteriorated, say so explicitly as a fundamentals note naming the "
+        "concrete event (guidance cut, filed numbers turning, competitive/"
+        "regulatory development) — otherwise omit sell language for held "
+        "names entirely.\n"
         "  3. The two biggest tail risks for the next 30 days.\n\n"
         "Then output your directives under exactly this heading:\n"
         "JSON_DIRECTIVES:\n" + _STRATEGIST_FORMAT
@@ -6280,7 +6953,16 @@ def run_deep_dive_analyst(candidates: dict, committee_state: dict) -> None:
             "rigorous. Vague bullishness will be torn apart.\n"
             "4. A buy case must rest on fundamentals (growth, margins, cash "
             "flow), valuation and momentum — never on hype or vague "
-            "bullishness.\n\n"
+            "bullishness.\n"
+            "5. For any candidate whose cyclicality field is DEEP_CYCLICAL "
+            "or CYCLICAL, the pitch MUST state where the industry sits in "
+            "its cycle (use cycle_phase / pct_above_200d_sma where "
+            "provided) and why NOW is not the peak — for a cyclical, "
+            "trailing growth alone is never an answer (peak-cycle numbers "
+            "are the best-looking numbers). If cycle_phase is EARLY, the "
+            "pitch must instead evidence that the NEW cycle is real "
+            "(pricing inflection, filed re-acceleration), not just that "
+            "the stock is cheap versus its bust.\n\n"
             "CANDIDATES (with SEC EDGAR data):\n"
             + json.dumps(chunk, indent=2) + "\n\n"
             "Output ONLY valid JSON (no markdown fences):\n" + _ANALYST_FORMAT
@@ -6437,6 +7119,20 @@ def run_devil_advocate(candidates: dict, committee_state: dict) -> None:
             "  - Moat erosion from competition or technology shift\n"
             "  - Valuation stretched vs. comparable peers\n"
             "  - Macro headwinds specific to this sector\n"
+            "  - PEAK-CYCLE TRAP (v5.6.1) for any candidate whose "
+            "cyclicality field is DEEP_CYCLICAL (memory/storage semis are "
+            "the archetype; CYCLICAL gets a softer version) — UNLESS its "
+            "cycle_phase is EARLY: in deep cyclicals, trailing fundamentals "
+            "look BEST precisely at the cycle top — strong revenue growth "
+            "and fat margins are not a defense, they are the setup. Attack "
+            "where the industry sits in its cycle (pricing momentum, "
+            "capacity additions, inventory builds, order books) and how "
+            "extended the price is (pct_above_200d_sma / cycle_phase "
+            "provided where available; LATE_CYCLE = maximum suspicion). "
+            "For cycle_phase=EARLY — a deep cyclical emerging from a bust — "
+            "the peak attack does not apply; attack instead whether the "
+            "upturn is REAL: restocking vs true demand, false-dawn risk, "
+            "balance-sheet survival through the trough.\n"
             "  - For any candidate tagged NARRATIVE_GAP, your PRIMARY attack "
             "is the VALUE TRAP case: these are names down 30%+ from their "
             "highs that the Analyst claims were de-rated on a disprovable "
@@ -6952,7 +7648,67 @@ def run_portfolio_manager(
         "same name twice just doubles single-stock exposure around the "
         "per-position cap. If you want more of a held name, add exposure "
         "through the bucket it already lives in (the add-on / dip-buy rules "
-        "apply). Python blocks violations at execution regardless.\n\n"
+        "apply). Python blocks violations at execution regardless.\n"
+        "17. NEVER CHASE VERTICALS (v5.5): do not propose a NEW position in "
+        "a name that is up 25% or more over roughly the last three weeks — "
+        "a violent short-term run-up is the most predictable setup for a "
+        "near-term correction (AXON was bought after a ~50% two-week rally "
+        "and round-tripped -7% in six days). Prefer names consolidating or "
+        "pulling back within intact uptrends; if a vertical name is truly "
+        "compelling, wait for digestion — it will still be there. Python "
+        "blocks such entries at execution regardless (growth/value "
+        "candidates carry ret_15td_pct so you can see the run-up "
+        "yourself).\n"
+        "18. STRATEGIST DIRECTIVES ROTATE NEW CAPITAL ONLY (v5.6): the "
+        "macro brief's rotation directives tell you where FRESH buys should "
+        "lean. They are NOT authority to sell or trim an existing holding. "
+        "Selling or trimming a held position requires either a mechanical "
+        "status flag / forced-review verdict (Rules 9-13) or a nameable "
+        "FUNDAMENTAL deterioration in that specific company — 'lock in "
+        "capital', 'it is in a drawdown', or macro/sector mood are never "
+        "sell reasons (Agent 6's price-is-not-a-thesis rule governs). If "
+        "the brief says 'trim X' citing only its price action, IGNORE that "
+        "instruction and note why in analysis_display. EVERY SELL you issue "
+        "MUST carry a sell_reason field: STATUS_FLAG (acting on a flag from "
+        "the positions list), REVIEW_VERDICT (acting on Agent 6, Rules "
+        "12-13), OPPORTUNITY_COST_SWAP (paired with its replacement BUY in "
+        "this same order list), or FUNDAMENTAL_DETERIORATION (with "
+        "fundamental_evidence naming the concrete event). ROTATION, "
+        "DRAWDOWN and RISK_MOOD are not valid reasons — Python blocks such "
+        "sells at execution. VERDICT SEVERITY IS BINDING (v5.8): TRIM_25 "
+        "means sell_pct <= 25 and TRIM_50 means sell_pct <= 50 — never "
+        "escalate a trim verdict into a full exit on your own authority; "
+        "if you believe full liquidation is warranted beyond the verdict, "
+        "you must independently justify it with sell_reason="
+        "FUNDAMENTAL_DETERIORATION plus concrete fundamental_evidence.\n"
+        "19. COMPANY TYPE MATTERS (v5.6.1): for candidates whose "
+        "cyclicality field is DEEP_CYCLICAL (memory/storage semis are the "
+        "archetype) AND whose cycle_phase is NOT 'EARLY', treat strong "
+        "trailing fundamentals after a big run as potential peak-cycle "
+        "evidence, not safety — a deep cyclical can top while its numbers "
+        "are still growing (cycle_phase='LATE' or a large "
+        "pct_above_200d_sma = maximum caution: smaller initial size, enter "
+        "on pullbacks, or pass entirely). The EXCEPTION is deliberate: a "
+        "deep cyclical at the BEGINNING of a new cycle (cycle_phase="
+        "'EARLY' — emerging from a bust, only modestly extended) is an "
+        "ATTRACTIVE setup and normal sizing applies; the question there is "
+        "whether the upturn is real, not whether this is the top. UNKNOWN "
+        "phase gets no exemption. For HELD cyclicals the exit bar is "
+        "unchanged: fundamental deterioration, not drawdown.\n"
+        "20. NO SUB-SCALE OPENERS (v5.8): do not propose a NEW position "
+        "that would land below 2% of NAV after sizing — a sub-scale "
+        "position cannot move the book but still costs monitoring and "
+        "review capacity every cycle. If caps or correlation resizes "
+        "would squeeze an idea below that floor, PASS and revisit when "
+        "there is room to size it properly. Python skips such openers at "
+        "execution regardless.\n"
+        "21. NO REVOLVING DOOR (v5.9): after a FULL exit, that ticker is "
+        "untouchable for 30 days — in ANY bucket — unless it has fallen at "
+        "least 15% below our exit price. Re-buying days later at roughly "
+        "the same price reverses a judgment this committee just made with "
+        "no new information. If you still like a name you just exited, the "
+        "correct expression is patience. Python blocks early re-entries at "
+        "execution.\n\n"
         "Output ONLY valid JSON (no markdown fences):\n" + _ORDER_FORMAT
     )
     try:
@@ -7562,6 +8318,21 @@ def run_thesis_reunderwriting_agent(
             "down', but the actual reason this was bought no longer "
             "holds.\n\n"
             "CRITICAL OUTPUT RULES:\n"
+            "  · PRICE IS NOT A THESIS (v5.5, non-negotiable): a falling "
+            "price, a compressing multiple, a scary drawdown, or headlines "
+            "that are ABOUT the price move are never, by themselves, "
+            "evidence the thesis broke. EXIT_RECOMMENDED requires a concrete "
+            "FUNDAMENTAL deterioration you can name: filed numbers turning "
+            "(revenue/margins in sec_financials), guidance cut, a "
+            "competitive or regulatory event, a stated catalyst that "
+            "failed. If the only thing that changed since entry is the "
+            "price and the mood around it, the verdict is THESIS_INTACT / "
+            "HOLD — trim only if concentration independently demands it. "
+            "For NARRATIVE_GAP positions this is doubly binding: they were "
+            "BOUGHT into fear, so further price weakness on intact "
+            "fundamentals WIDENS the gap the position exists to own; "
+            "selling it on that weakness is buying high and selling low by "
+            "construction.\n"
             "  · `what_changed` MUST name the specific original thesis "
             "point AND the specific new evidence against (or for) it. "
             "Never write generic text like 'mixed signals' or 'monitor "
@@ -7693,6 +8464,7 @@ def _build_forced_review_failsafe_orders(portfolio: dict, forced_reviews: dict,
                 "ticker": ticker,
                 "strategy_bucket": bucket,
                 "sell_pct": 50,
+                "sell_reason": "REVIEW_FAILSAFE",
                 "analysis_display": (
                     f"OPERATIONAL FAIL-SAFE: {streak} consecutive cycles "
                     f"without a parsed Thesis Re-Underwriting Agent response "
@@ -8165,6 +8937,7 @@ def execute_mandatory_exits(mandatory_exits: list, portfolio: dict) -> None:
         log_closed_position(ticker, pos, cp, status)
         _pos_snapshot = dict(pos)
         portfolio["cash_balance"] += rec
+        _record_full_exit(portfolio, pk, cp, status)   # v5.9 revolving-door memory
         del portfolio["positions"][pk]
 
         # v5.0 Step 6 — full quantity facts on every mandatory exit; the
@@ -8332,6 +9105,22 @@ def execute_agent_orders(orders: list, portfolio: dict, all_candidates: dict,
                 except Exception:
                     pass
 
+                # v5.7 — Rule 18 deterministic backstop: a discretionary
+                # sell (no mechanical flag, no Agent-6 verdict) must carry a
+                # valid sell_reason or it dies here. Rotation/drawdown/mood
+                # sells cannot execute regardless of what the macro brief or
+                # the PM decided. Mandatory exits never route through this
+                # branch, so they are untouched.
+                _ok, _why = discretionary_sell_allowed(
+                    o, pk, risk_matrix,
+                    (committee_state or {}).get("thesis_reviews", []),
+                    orders)
+                if not _ok:
+                    log_and_print(
+                        f"{RED}[Exec] SELL {ticker} ({pk}) BLOCKED — "
+                        f"{_why}.{RST}")
+                    continue
+
                 cp = risk_matrix.get(pk, {}).get("current_price", pos["entry_price"])
 
                 # v4.6 fix: a TRIM exists to lock in gains on a runner ONCE
@@ -8397,6 +9186,8 @@ def execute_agent_orders(orders: list, portfolio: dict, all_candidates: dict,
                     log_closed_position(ticker, pos, cp, reason)
                     _pos_snapshot = dict(pos)   # note context survives the del
                     portfolio["cash_balance"] += rec
+                    _record_full_exit(portfolio, pk, cp,
+                                      reason + note)   # v5.9 revolving-door memory
                     del portfolio["positions"][pk]
                     # Python facts ALWAYS send; the AI note is best-effort
                     # on top (same isolation contract as the buy notes).
@@ -8510,6 +9301,59 @@ def execute_agent_orders(orders: list, portfolio: dict, all_candidates: dict,
                     f"{_other_pk}; one ticker, one bucket. Exposure can only "
                     f"be added through the held bucket's add-on rules.{RST}")
                 continue
+
+            # ── v5.9: revolving-door guard (the ADBE round-trip) ─────────
+            # A FULL exit puts the TICKER on a re-entry cooldown in every
+            # bucket; only a genuine markdown vs our exit price waives it.
+            # Buying back days later at ~the same price reverses a
+            # judgment the committee just made with zero new information.
+            if f"{ticker}_{bucket}" not in portfolio["positions"]:
+                _rb, _rbw = reentry_blocked(
+                    portfolio.get("recent_exits", {}), ticker,
+                    datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
+                    float((cand or {}).get("price") or 0))
+                if _rb:
+                    log_and_print(f"{RED}[Exec] {ticker} BUY BLOCKED — "
+                                  f"{_rbw}.{RST}")
+                    continue
+
+            # ── v5.5: entry run-up gate (Luca: "NEVER buy after a
+            # vertical") — a NEW position in a name up >= ENTRY_RUNUP_
+            # BLOCK_PCT over the last ENTRY_RUNUP_LOOKBACK_TD trading days
+            # is blocked outright; short-term verticals mean-revert (AXON:
+            # bought after a ~50%/2-week rally, -7% in six days). Add-ons
+            # are exempt — the dip-buy machinery already requires a
+            # pullback. One extra 2-month history fetch per NEW buy order.
+            if f"{ticker}_{bucket}" not in portfolio["positions"]:
+                _runup = None
+                # v5.7 — the screeners already computed the 15-trading-day
+                # return on growth/value candidates; reuse it and skip the
+                # 2-month refetch. NGap-sourced cands lack it -> fetch.
+                _c15 = cand.get("ret_15td_pct") if isinstance(cand, dict) else None
+                if isinstance(_c15, (int, float)):
+                    _runup = float(_c15)
+                if _runup is None:
+                    try:
+                        _h2 = yf.Ticker(ticker).history(period="2mo")["Close"]
+                        if _h2 is not None and len(_h2) >= 2:
+                            _base = float(
+                                _h2.iloc[-(ENTRY_RUNUP_LOOKBACK_TD + 1)]
+                                if len(_h2) > ENTRY_RUNUP_LOOKBACK_TD
+                                else _h2.iloc[0])   # young listing: since first bar
+                            _lastp = float(_h2.iloc[-1])
+                            if _base > 0:
+                                _runup = (_lastp / _base - 1) * 100.0
+                    except Exception:
+                        _runup = None           # no data -> no accusation
+                if _runup is not None and _runup >= ENTRY_RUNUP_BLOCK_PCT:
+                    log_and_print(
+                        f"{YLW}[Exec] {ticker} BLOCKED — up "
+                        f"{_runup:.0f}% in the last "
+                        f"{ENTRY_RUNUP_LOOKBACK_TD} trading days "
+                        f"(>= {ENTRY_RUNUP_BLOCK_PCT:.0f}% vertical gate). "
+                        f"Chasing short-term verticals is how AXON "
+                        f"round-tripped; wait for digestion.{RST}")
+                    continue
 
             # ── v5.3: does this BUY unlock the cash-floor override? ──────
             # A max-conviction idea (HIGH + STRONG) may consume the regime
@@ -8704,6 +9548,20 @@ def execute_agent_orders(orders: list, portfolio: dict, all_candidates: dict,
                                   f"below $500 floor — skip.{RST}")
                     continue
 
+            # v5.8 — sub-scale opener gate: after every resize/cap, a NEW
+            # position must still be worth opening. TSM landed at 1.0% of
+            # NAV post-resize; below the floor the right move is to pass,
+            # not to hold dust. Add-ons exempt.
+            if (f"{ticker}_{bucket}" not in portfolio["positions"]
+                    and val < current_nav * MIN_NEW_POSITION_PCT):
+                log_and_print(
+                    f"{YLW}[Exec] {ticker} BUY skipped — sized "
+                    f"${val:,.0f} ({val / max(current_nav, 1) * 100:.1f}% of "
+                    f"NAV) is below the {MIN_NEW_POSITION_PCT * 100:.0f}% "
+                    f"minimum for a NEW position. Size it properly or "
+                    f"pass.{RST}")
+                continue
+
             sh           = val / cp
             pos_key      = f"{ticker}_{bucket}"
             was_existing = pos_key in portfolio["positions"]
@@ -8753,6 +9611,7 @@ def execute_agent_orders(orders: list, portfolio: dict, all_candidates: dict,
                     "forced_review_fail_streak": 0,
                     # v4.11 — controlled buy-the-dip (see DIP_BUY_* constants).
                     "dip_buy_count":    0,
+                    "pwer_drift_streak": 0,
                     "last_dip_buy_date": None,
                 }
 
@@ -9013,7 +9872,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     log_and_print(f"{CYN}{'='*60}{RST}")
-    log_and_print(f"{CYN}   GV PORTFOLIO SYSTEM v5.4.1 — INITIALIZING         {RST}")
+    log_and_print(f"{CYN}   GV PORTFOLIO SYSTEM v5.9 — INITIALIZING         {RST}")
     log_and_print(f"{CYN}   Strategist → Memory → Analyst(+EDGAR) → Advocate → EarningsPreview → ThesisReview → PM → RiskOfficer  {RST}")
     log_and_print(f"{CYN}   Model: {GEMINI_MODEL}                             {RST}")
     log_and_print(f"{CYN}{'='*60}{RST}")
@@ -9029,8 +9888,14 @@ if __name__ == "__main__":
 
     # ── Phase 2: Two-Bucket Screening ────────────────────────────────
     log_and_print(f"{CYN}[Phase 2] Running GV screeners...{RST}")
-    g_cands = run_growth_screener(universe, active_tailwinds, sector_map)
-    v_cands = run_value_screener(universe)
+    # v5.7 — one batched price download for the whole universe (plus SPY
+    # for the relative-strength benchmark); screeners consume the cache
+    # and fall back per-ticker for anything the batch missed.
+    _FMH_CACHE.clear()
+    price_cache = prefetch_price_history(list(universe) + ["SPY"])
+    g_cands = run_growth_screener(universe, active_tailwinds, sector_map,
+                                  price_cache=price_cache)
+    v_cands = run_value_screener(universe, price_cache=price_cache)
 
     # ── BEAR GARP pass: Growth names at intrinsic-value discount ─────
     # In BEAR regime, quality growth stocks (NOW, CRM, CELH…) that are
@@ -9142,6 +10007,22 @@ if __name__ == "__main__":
             g_cands.pop(_tk)
             log_and_print(f"{YLW}[Dedup] {_tk} dropped from GROWTH candidates "
                           f"— already held as {_tk}_{BUCKET_V}.{RST}")
+
+    # v5.9 — REVOLVING-DOOR scrub: a ticker fully exited inside the
+    # cooldown is removed from every candidate pool before the committee
+    # or PM see it (ADBE: exited on a broken thesis, re-bought 2 days
+    # later at ~the same price through the value screener). Early
+    # re-entry only at a genuine markdown vs our exit.
+    _today_iso = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+    _prune_recent_exits(portfolio, _today_iso)
+    for _pool in (g_cands, v_cands):
+        for _tk in list(_pool):
+            _blk, _why = reentry_blocked(
+                portfolio.get("recent_exits", {}), _tk, _today_iso,
+                float((_pool[_tk] or {}).get("price") or 0))
+            if _blk:
+                _pool.pop(_tk)
+                log_and_print(f"{YLW}[Dedup] {_tk} dropped — {_why}.{RST}")
 
     all_cands = merge_candidates_dedup(g_cands, v_cands)
 
@@ -9512,7 +10393,7 @@ if __name__ == "__main__":
 
     _n_att, _n_grd = gemini_call_counts()
     log_and_print(f"{CYN}{'='*60}{RST}")
-    log_and_print(f"{CYN}   GV SYSTEM v5.4.1 CYCLE COMPLETE                   {RST}")
+    log_and_print(f"{CYN}   GV SYSTEM v5.9 CYCLE COMPLETE                   {RST}")
     log_and_print(f"{CYN}   Gemini API attempts this cycle: {_n_att} "
                   f"({_n_grd} grounded)                     {RST}")
     log_and_print(
