@@ -1,5 +1,5 @@
 {
-    "cash_balance": 4159.582217564754,
+    "cash_balance": 4081.9455481654686,
     "positions": {
         "MU_GROWTH": {
             "entry_price": 984.75,
@@ -13,8 +13,8 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 28.2,
-            "pwer_last_known": 8.8,
-            "last_reunderwritten": "2026-08-05",
+            "pwer_last_known": 4.2,
+            "last_reunderwritten": "2026-08-06",
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
             "last_dip_buy_date": null,
@@ -42,7 +42,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 24.0,
-            "pwer_last_known": 14.2,
+            "pwer_last_known": 22.2,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -70,7 +70,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 16.5,
-            "pwer_last_known": 12.4,
+            "pwer_last_known": 9.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -88,18 +88,18 @@
         },
         "CRM_GROWTH": {
             "entry_price": 169.52000427246094,
-            "shares": 46.025113870690774,
-            "allocated_capital": 7802.177500000001,
+            "shares": 23.012556935345387,
+            "allocated_capital": 3901.0887500000003,
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-07-07",
             "buying_thesis": "PWER 18.0, MODERATE thesis strength. Data Cloud and Agentforce adoption re-accelerating top-line growth, closing the 38% derating gap. Sized at Kelly adjusted max.",
             "high_watermark": 192.97999572753906,
-            "trim_count": 0,
+            "trim_count": 1,
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.0,
-            "pwer_last_known": 8.8,
-            "last_reunderwritten": null,
+            "pwer_last_known": 9.5,
+            "last_reunderwritten": "2026-08-06",
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
             "last_dip_buy_date": null,
@@ -113,7 +113,7 @@
                 }
             ],
             "data_unavailable_streak": 0,
-            "pwer_drift_streak": 1
+            "pwer_drift_streak": 0
         },
         "GRAB_GROWTH": {
             "entry_price": 3.809999942779541,
@@ -127,7 +127,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.8,
-            "pwer_last_known": 17.0,
+            "pwer_last_known": 17.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -155,7 +155,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 22.5,
-            "pwer_last_known": 16.0,
+            "pwer_last_known": 14.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -212,7 +212,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 17.5,
-            "pwer_last_known": 8.8,
+            "pwer_last_known": 9.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -240,7 +240,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 30.8,
-            "pwer_last_known": 18.2,
+            "pwer_last_known": 15.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 1,
             "dip_buy_count": 0,
@@ -255,7 +255,7 @@
                 }
             ],
             "data_unavailable_streak": 0,
-            "pwer_drift_streak": 0
+            "pwer_drift_streak": 1
         },
         "TSM_GROWTH": {
             "entry_price": 421.2099914550781,
@@ -269,7 +269,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.0,
-            "pwer_last_known": 21.8,
+            "pwer_last_known": 17.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -297,7 +297,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 11.0,
-            "pwer_last_known": 11.0,
+            "pwer_last_known": 18.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -325,7 +325,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 23.5,
-            "pwer_last_known": 23.5,
+            "pwer_last_known": 17.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -354,7 +354,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 25.5,
-            "pwer_last_known": 22.2,
+            "pwer_last_known": 16.2,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -383,7 +383,7 @@
             "tailwind_at_entry": "AI_SOFTWARE_CLOUD",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 17.2,
-            "pwer_last_known": 9.4,
+            "pwer_last_known": 11.8,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -399,10 +399,39 @@
                 }
             ],
             "data_unavailable_streak": 0
+        },
+        "AXON_GROWTH": {
+            "entry_price": 522.4600219726562,
+            "shares": 12.172452881634722,
+            "allocated_capital": 6359.62,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-08-06",
+            "buying_thesis": "Adding AXON to fill the open slot. PWER is strong at 27.75% with a MODERATE thesis strength and HIGH conviction. The company is delivering 33.7% revenue growth with 59.5% gross margins, presenting a compelling opportunity to close the narrative gap after a 41% de-rating.",
+            "high_watermark": 522.4600219726562,
+            "trim_count": 0,
+            "tailwind_at_entry": "UNCATEGORIZED",
+            "regime_at_entry": "BULL",
+            "pwer_at_entry": 27.8,
+            "pwer_last_known": 27.8,
+            "last_reunderwritten": null,
+            "forced_review_fail_streak": 0,
+            "dip_buy_count": 0,
+            "pwer_drift_streak": 0,
+            "last_dip_buy_date": null,
+            "thesis_log": [
+                {
+                    "date": "2026-08-06",
+                    "action": "INITIAL_BUY",
+                    "usd": 6359.62,
+                    "price": 522.46,
+                    "thesis": "Axon is a new 6.2 percent position because the market is mispricing its evolution from a hardware vendor to a high-margin cloud ecosystem.\n\nAxon dominates the law enforcement technology stack, but is still valued as a cyclical hardware business. As police departments upgrade, the real mechanism is the aggressive bundling of software and cloud storage with every device. This mix shift structurally expands profitability, driving 59.5 percent gross margins and accelerating cash flow beyond legacy multiples.\n\nThe bear case is that municipal budget constraints will delay large-scale deployments. Yet the company is delivering relentless revenue growth, proving public safety tech is treated as non-discretionary even in tight environments. The falsifier I am watching is any sequential compression in software attachment rates, which would signal pricing power is cracking.\n\nThe Goldman Sachs technology conference on September 8 is the next catalyst to confirm federal bookings momentum.\n\nPosting reasoning, not a recommendation."
+                }
+            ],
+            "data_unavailable_streak": 0
         }
     },
     "sleeve": {
         "ticker": "SPY",
-        "shares": 26.225064388388713
+        "shares": 23.643706943181574
     }
 }
