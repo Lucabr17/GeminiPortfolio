@@ -1,5 +1,5 @@
 {
-    "cash_balance": 4286.814942934522,
+    "cash_balance": 4176.791170765377,
     "positions": {
         "NVDA_GROWTH": {
             "entry_price": 195.5500030517578,
@@ -13,8 +13,8 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 24.0,
-            "pwer_last_known": 7.8,
-            "last_reunderwritten": "2026-08-10",
+            "pwer_last_known": 22.0,
+            "last_reunderwritten": "2026-08-17",
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
             "last_dip_buy_date": null,
@@ -28,7 +28,7 @@
                 }
             ],
             "data_unavailable_streak": 0,
-            "pwer_drift_streak": 1
+            "pwer_drift_streak": 0
         },
         "ORCL_GROWTH": {
             "entry_price": 141.60000610351562,
@@ -42,7 +42,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 16.5,
-            "pwer_last_known": 16.5,
+            "pwer_last_known": 12.4,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -70,7 +70,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.0,
-            "pwer_last_known": 12.5,
+            "pwer_last_known": 13.7,
             "last_reunderwritten": "2026-08-06",
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -99,7 +99,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.8,
-            "pwer_last_known": 16.5,
+            "pwer_last_known": 20.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -127,7 +127,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 22.5,
-            "pwer_last_known": 14.5,
+            "pwer_last_known": 20.8,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -184,7 +184,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 17.5,
-            "pwer_last_known": 12.5,
+            "pwer_last_known": 13.7,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -207,12 +207,12 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-07-22",
             "buying_thesis": "PWER score 100 (19.0%), debate outcome: MODERATE thesis_strength. Redeploying capital into CYBERSECURITY per sector rotation directive. Hyper-growth compounder with 36% revenue growth and 40% ROE.",
-            "high_watermark": 430.489990234375,
+            "high_watermark": 430.9700012207031,
             "trim_count": 0,
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.0,
-            "pwer_last_known": 19.0,
+            "pwer_last_known": 21.9,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -247,7 +247,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 11.0,
-            "pwer_last_known": 16.2,
+            "pwer_last_known": 17.2,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -275,7 +275,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 23.5,
-            "pwer_last_known": 17.5,
+            "pwer_last_known": 19.6,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -304,11 +304,11 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 25.5,
-            "pwer_last_known": 15.0,
+            "pwer_last_known": 12.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
-            "pwer_drift_streak": 0,
+            "pwer_drift_streak": 1,
             "last_dip_buy_date": null,
             "thesis_log": [
                 {
@@ -333,7 +333,7 @@
             "tailwind_at_entry": "AI_SOFTWARE_CLOUD",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 17.2,
-            "pwer_last_known": 13.3,
+            "pwer_last_known": 15.0,
             "last_reunderwritten": "2026-08-10",
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -362,7 +362,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 27.8,
-            "pwer_last_known": 16.8,
+            "pwer_last_known": 18.9,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -391,7 +391,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 14.0,
-            "pwer_last_known": 14.5,
+            "pwer_last_known": 16.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -407,11 +407,69 @@
                 }
             ],
             "data_unavailable_streak": 0
+        },
+        "RKLB_GROWTH": {
+            "entry_price": 82.08000183105469,
+            "shares": 56.78240614069577,
+            "allocated_capital": 4660.7,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-08-17",
+            "buying_thesis": "Initiating RKLB (PWER 27.5%, thesis_strength MODERATE) as an opportunity cost swap replacement for ORCL. RKLB offers a compelling narrative gap setup with 62% revenue growth despite a 46% de-rating from highs.",
+            "high_watermark": 82.08000183105469,
+            "trim_count": 0,
+            "tailwind_at_entry": "UNCATEGORIZED",
+            "regime_at_entry": "BULL",
+            "pwer_at_entry": 27.5,
+            "pwer_last_known": 27.5,
+            "last_reunderwritten": null,
+            "forced_review_fail_streak": 0,
+            "dip_buy_count": 0,
+            "pwer_drift_streak": 0,
+            "last_dip_buy_date": null,
+            "thesis_log": [
+                {
+                    "date": "2026-08-17",
+                    "action": "INITIAL_BUY",
+                    "usd": 4660.7,
+                    "price": 82.08,
+                    "thesis": "Rocket Lab is a new 4.5 percent position because the market is mispricing its transition from a niche launch provider to an end-to-end space systems prime.\n\nThe company builds rockets and satellite infrastructure, but the stock is penalized as a capital-intensive launch business. The actual value driver is the rapid scaling of its space systems contracts, which command structurally higher margins. As the upcoming medium-lift Neutron rocket comes online, it unlocks larger payload markets and vertically integrates their satellite services, directly driving margin expansion across the entire business model.\n\nThe bear case assumes Neutron development delays or launch failures will burn through cash reserves. However, their expanding backlog provides a cash-flow bridge that insulates the balance sheet from launch-schedule volatility. The thesis breaks if space systems revenue stalls before Neutron achieves regular flight.\n\nWe are watching the Q3 earnings print in mid-November 2026 to verify continued backlog conversion.\n\nPosting reasoning, not a recommendation."
+                }
+            ],
+            "data_unavailable_streak": 0
+        },
+        "NVO_GROWTH": {
+            "entry_price": 44.880001068115234,
+            "shares": 76.83055718204508,
+            "allocated_capital": 3448.155488394072,
+            "strategy_bucket": "GROWTH",
+            "purchase_date": "2026-08-17",
+            "buying_thesis": "Adding NVO (PWER 10.25%, thesis_strength MODERATE) to the Growth bucket. The stock presents a 30% narrative gap de-rating with intact GLP-1 catalysts and easing supply constraints, fitting our aggressive risk budget.",
+            "high_watermark": 44.880001068115234,
+            "trim_count": 0,
+            "tailwind_at_entry": "UNCATEGORIZED",
+            "regime_at_entry": "BULL",
+            "pwer_at_entry": 10.2,
+            "pwer_last_known": 10.2,
+            "last_reunderwritten": null,
+            "forced_review_fail_streak": 0,
+            "dip_buy_count": 0,
+            "pwer_drift_streak": 0,
+            "last_dip_buy_date": null,
+            "thesis_log": [
+                {
+                    "date": "2026-08-17",
+                    "action": "INITIAL_BUY",
+                    "usd": 3448.16,
+                    "price": 44.88,
+                    "thesis": "Novo Nordisk is a new 3.3 percent position, bought because easing supply bottlenecks for its metabolic treatments will unlock deferred revenue and drive multiple expansion.\n\nAs manufacturing constraints clear, the resulting volume surge directly translates to top-line acceleration and margin leverage. While our thesis relies on pipeline readouts exceeding expectations, recent clinical setbacks\u2014specifically CagriSema failing to beat a key rival in recent trials\u2014create tension we are monitoring. Still, the core mechanism of unconstrained supply meeting unmet demand remains intact.\n\nThe market fears intensifying obesity competition and pricing pressures will compress margins. However, broad underpenetrated global demand means volume growth will outpace near-term price concessions. The falsifier here is a sequential decline in net revenue per prescription, signaling price erosion is destroying the volume advantage.\n\nThe next test of supply-driven volume is the third-quarter earnings print on November 4.\n\nPosting reasoning, not a recommendation."
+                }
+            ],
+            "data_unavailable_streak": 0
         }
     },
     "sleeve": {
         "ticker": "SPY",
-        "shares": 28.823576842659943
+        "shares": 18.47138005341958
     },
     "recent_exits": {
         "APP": {
