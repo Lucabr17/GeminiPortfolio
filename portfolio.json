@@ -13,7 +13,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 24.0,
-            "pwer_last_known": 22.0,
+            "pwer_last_known": 9.0,
             "last_reunderwritten": "2026-08-17",
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -28,7 +28,7 @@
                 }
             ],
             "data_unavailable_streak": 0,
-            "pwer_drift_streak": 0
+            "pwer_drift_streak": 1
         },
         "ORCL_GROWTH": {
             "entry_price": 141.60000610351562,
@@ -42,7 +42,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 16.5,
-            "pwer_last_known": 12.4,
+            "pwer_last_known": 13.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -70,7 +70,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.0,
-            "pwer_last_known": 13.7,
+            "pwer_last_known": 10.5,
             "last_reunderwritten": "2026-08-06",
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -99,7 +99,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.8,
-            "pwer_last_known": 20.0,
+            "pwer_last_known": 19.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -127,7 +127,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 22.5,
-            "pwer_last_known": 20.8,
+            "pwer_last_known": 17.8,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -155,7 +155,7 @@
             "tailwind_at_entry": "HEALTHCARE_BIOTECH",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 18.9,
-            "pwer_last_known": 12.0,
+            "pwer_last_known": 4.0,
             "last_reunderwritten": "2026-08-13",
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -170,7 +170,7 @@
                 }
             ],
             "data_unavailable_streak": 0,
-            "pwer_drift_streak": 0
+            "pwer_drift_streak": 1
         },
         "CRM_VALUE": {
             "entry_price": 167.55999755859375,
@@ -184,7 +184,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 17.5,
-            "pwer_last_known": 13.7,
+            "pwer_last_known": 10.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -212,7 +212,7 @@
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 19.0,
-            "pwer_last_known": 21.9,
+            "pwer_last_known": 7.8,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -233,7 +233,8 @@
                     "thesis": "We are adding $1,797 to TSM, taking it to 2.6 percent of NAV, because sustained artificial intelligence chip demand is driving advanced node utilization that translates directly into pricing power.\n\nTaiwan Semiconductor manufactures the silicon powering the modern economy, holding a near-monopoly on complex architectures. The market underestimates how structural this hardware cycle is for their leading-edge capacity. As customers fight for allocation, the foundry gains pricing leverage at the negotiating table. This scarcity allows them to push through price increases that drop straight to the bottom line, expanding margins.\n\nThe bear case argues that geopolitical tail-risk is unpriced and that heavy capital expenditures will crush free cash flow if demand normalizes. Yet the volume of locked-in orders provides a buffer, ensuring investments yield immediate returns. The thesis breaks if leading-edge utilization rates drop.\n\nWe watch the October 15 earnings print to confirm sustained pricing power.\n\nPosting reasoning, not a recommendation."
                 }
             ],
-            "data_unavailable_streak": 0
+            "data_unavailable_streak": 0,
+            "pwer_drift_streak": 1
         },
         "ADBE_VALUE": {
             "entry_price": 212.1699981689453,
@@ -247,7 +248,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 11.0,
-            "pwer_last_known": 17.2,
+            "pwer_last_known": 7.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -275,7 +276,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 23.5,
-            "pwer_last_known": 19.6,
+            "pwer_last_known": 14.0,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -304,11 +305,11 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 25.5,
-            "pwer_last_known": 12.5,
+            "pwer_last_known": 14.5,
             "last_reunderwritten": null,
-            "forced_review_fail_streak": 0,
+            "forced_review_fail_streak": 1,
             "dip_buy_count": 0,
-            "pwer_drift_streak": 1,
+            "pwer_drift_streak": 0,
             "last_dip_buy_date": null,
             "thesis_log": [
                 {
@@ -333,11 +334,11 @@
             "tailwind_at_entry": "AI_SOFTWARE_CLOUD",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 17.2,
-            "pwer_last_known": 15.0,
+            "pwer_last_known": 5.5,
             "last_reunderwritten": "2026-08-10",
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
-            "pwer_drift_streak": 0,
+            "pwer_drift_streak": 1,
             "last_dip_buy_date": null,
             "thesis_log": [
                 {
@@ -362,11 +363,11 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 27.8,
-            "pwer_last_known": 18.9,
+            "pwer_last_known": 12.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
-            "pwer_drift_streak": 0,
+            "pwer_drift_streak": 1,
             "last_dip_buy_date": null,
             "thesis_log": [
                 {
@@ -391,7 +392,7 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 14.0,
-            "pwer_last_known": 16.5,
+            "pwer_last_known": 14.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
@@ -420,11 +421,11 @@
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 27.5,
-            "pwer_last_known": 27.5,
+            "pwer_last_known": 10.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
-            "pwer_drift_streak": 0,
+            "pwer_drift_streak": 1,
             "last_dip_buy_date": null,
             "thesis_log": [
                 {
@@ -444,12 +445,12 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-08-17",
             "buying_thesis": "Adding NVO (PWER 10.25%, thesis_strength MODERATE) to the Growth bucket. The stock presents a 30% narrative gap de-rating with intact GLP-1 catalysts and easing supply constraints, fitting our aggressive risk budget.",
-            "high_watermark": 44.880001068115234,
+            "high_watermark": 45.709999084472656,
             "trim_count": 0,
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 10.2,
-            "pwer_last_known": 10.2,
+            "pwer_last_known": 10.5,
             "last_reunderwritten": null,
             "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
