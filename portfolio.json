@@ -1,5 +1,5 @@
 {
-    "cash_balance": 4176.791170765377,
+    "cash_balance": 4325.088925006445,
     "positions": {
         "NVDA_GROWTH": {
             "entry_price": 195.5500030517578,
@@ -8,7 +8,7 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-07-06",
             "buying_thesis": "Adding to AI Semiconductors per sector directive. PWER score of 24.0 and MODERATE thesis strength with HIGH conviction. Undisputed AI leader with 85% revenue growth and 114% ROE.",
-            "high_watermark": 225.3000030517578,
+            "high_watermark": 227.97999572753906,
             "trim_count": 0,
             "tailwind_at_entry": "AI_SEMICONDUCTORS",
             "regime_at_entry": "BULL",
@@ -65,7 +65,7 @@
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-07-07",
             "buying_thesis": "PWER 18.0, MODERATE thesis strength. Data Cloud and Agentforce adoption re-accelerating top-line growth, closing the 38% derating gap. Sized at Kelly adjusted max.",
-            "high_watermark": 209.1699981689453,
+            "high_watermark": 252.0500030517578,
             "trim_count": 1,
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
@@ -172,34 +172,6 @@
             "data_unavailable_streak": 0,
             "pwer_drift_streak": 0
         },
-        "CRM_VALUE": {
-            "entry_price": 167.55999755859375,
-            "shares": 13.421546402787088,
-            "allocated_capital": 2248.914282483557,
-            "strategy_bucket": "VALUE",
-            "purchase_date": "2026-07-14",
-            "buying_thesis": "PWER score 72.0, thesis MODERATE. Deep 89.3% historical discount with 12.06% FCF yield. Strong cash-flow compounder fitting the Value mandate.",
-            "high_watermark": 209.1699981689453,
-            "trim_count": 0,
-            "tailwind_at_entry": "UNCATEGORIZED",
-            "regime_at_entry": "BULL",
-            "pwer_at_entry": 17.5,
-            "pwer_last_known": 13.3,
-            "last_reunderwritten": null,
-            "forced_review_fail_streak": 0,
-            "dip_buy_count": 0,
-            "last_dip_buy_date": null,
-            "thesis_log": [
-                {
-                    "date": "2026-07-14",
-                    "action": "INITIAL_BUY",
-                    "usd": 2248.91,
-                    "price": 167.56,
-                    "thesis": "Salesforce is a new 2.3 percent position because its transition into a cash-flow compounder sets up a multiple expansion cycle driven by capital returns.\n\nThe core enterprise software franchise remains highly cash-generative, yet the market has compressed its valuation to a 10.8x forward earnings multiple. By aggressively repurchasing shares while sustaining a double-digit free cash flow yield, the company is forcing a re-rating. This capital return strategy directly drives multiple expansion even if top-line growth normalizes, providing an asymmetric entry point in a disinflationary environment.\n\nThe bear case assumes enterprise software spending decelerates and new artificial intelligence features fail to monetize. However, sustained revenue growth proves the underlying franchise remains resilient against macro headwinds. The thesis breaks if we see a sudden collapse in enterprise seat renewals.\n\nThe next test is the September 2 earnings print.\n\nPosting reasoning, not a recommendation."
-                }
-            ],
-            "data_unavailable_streak": 0
-        },
         "TSM_GROWTH": {
             "entry_price": 426.3268157558378,
             "shares": 6.498223276363601,
@@ -243,7 +215,7 @@
             "strategy_bucket": "VALUE",
             "purchase_date": "2026-07-23",
             "buying_thesis": "PWER 11.0, thesis_strength MODERATE. Adding ADBE as a value play given its deep historical discount (86.5%) and strong FCF yield (10.93%), despite generative AI risks. Growth candidates skipped due to AI_SEMICONDUCTORS cluster already exceeding the max 2 positions limit.",
-            "high_watermark": 276.2699890136719,
+            "high_watermark": 289.1499938964844,
             "trim_count": 0,
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
@@ -271,7 +243,7 @@
             "strategy_bucket": "VALUE",
             "purchase_date": "2026-08-03",
             "buying_thesis": "PWER score 23.5, debate outcome MODERATE. NOW is a secular growth compounder trading at a deep 49.8% historical discount with 24.0% revenue growth. Filed evidence disproves the disruption narrative, making this a strong value play in the current regime.",
-            "high_watermark": 129.75,
+            "high_watermark": 138.42999267578125,
             "trim_count": 0,
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
@@ -470,7 +442,7 @@
     },
     "sleeve": {
         "ticker": "SPY",
-        "shares": 18.47138005341958
+        "shares": 22.66617081979568
     },
     "recent_exits": {
         "APP": {
@@ -484,6 +456,12 @@
             "pos_key": "MU_GROWTH",
             "exit_price": 949.83,
             "why": "AGENT_SELL (trim limit 1 reached) [escalated: already trimmed \u2014 closing in full]"
+        },
+        "CRM": {
+            "date": "2026-08-28",
+            "pos_key": "CRM_VALUE",
+            "exit_price": 252.05,
+            "why": "TAKE_PROFIT: V price $252.0500030517578 reached intrinsic value $206.2"
         }
     }
 }
