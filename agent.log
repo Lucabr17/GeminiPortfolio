@@ -322521,3 +322521,4 @@ Posting reasoning, not a recommendation.
 2026-09-04 22:27:58,660 | INFO |    Gemini API attempts this cycle: 10 (4 grounded)                     
 2026-09-04 22:27:58,660 | INFO |    Book: 87.5% stocks | 8.5% SPY sleeve | 4.0% cash
 2026-09-04 22:27:58,660 | INFO | ============================================================
+2026-09-07 22:49:30,908 | INFO | [Gate] US market closed today (Labor Day) — cycle skipped, no API spend.
