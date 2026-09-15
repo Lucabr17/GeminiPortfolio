@@ -1,5 +1,5 @@
 {
-    "cash_balance": 4256.906870103787,
+    "cash_balance": 3999.9760752310845,
     "positions": {
         "NVDA_GROWTH": {
             "entry_price": 195.5500030517578,
@@ -449,7 +449,7 @@
     },
     "sleeve": {
         "ticker": "SPY",
-        "shares": 11.700528681718385
+        "shares": 12.039760504033818
     },
     "recent_exits": {
         "APP": {
