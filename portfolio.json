@@ -452,12 +452,6 @@
         "shares": 12.039760504033818
     },
     "recent_exits": {
-        "APP": {
-            "date": "2026-08-10",
-            "pos_key": "APP_GROWTH",
-            "exit_price": 339.0,
-            "why": "AGENT_SELL (trim limit 1 reached) [escalated: already trimmed \u2014 closing in full]"
-        },
         "MU": {
             "date": "2026-08-13",
             "pos_key": "MU_GROWTH",
