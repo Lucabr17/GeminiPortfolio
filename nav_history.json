@@ -520,5 +520,14 @@
     "positions_value": 89071.84,
     "positions": 15,
     "complete": true
+  },
+  {
+    "date": "2026-09-25",
+    "nav": 101840.78,
+    "cash": 3999.98,
+    "sleeve_value": 9286.87,
+    "positions_value": 88553.93,
+    "positions": 15,
+    "complete": true
   }
 ]
