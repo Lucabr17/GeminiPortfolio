@@ -1,5 +1,5 @@
 {
-    "cash_balance": 3999.9760752310845,
+    "cash_balance": NaN,
     "positions": {
         "NVDA_GROWTH": {
             "entry_price": 195.5500030517578,
@@ -449,15 +449,9 @@
     },
     "sleeve": {
         "ticker": "SPY",
-        "shares": 12.039760504033818
+        "shares": NaN
     },
     "recent_exits": {
-        "MU": {
-            "date": "2026-08-13",
-            "pos_key": "MU_GROWTH",
-            "exit_price": 949.83,
-            "why": "AGENT_SELL (trim limit 1 reached) [escalated: already trimmed \u2014 closing in full]"
-        },
         "CRM": {
             "date": "2026-08-28",
             "pos_key": "CRM_VALUE",
