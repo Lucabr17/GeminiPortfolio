@@ -257,7 +257,7 @@
             "pwer_at_entry": 23.5,
             "pwer_last_known": 9.5,
             "last_reunderwritten": "2026-10-01",
-            "forced_review_fail_streak": 3,
+            "forced_review_fail_streak": 4,
             "dip_buy_count": 0,
             "pwer_drift_streak": 1,
             "last_dip_buy_date": null,
@@ -268,35 +268,6 @@
                     "usd": 2232.04,
                     "price": 114.19,
                     "thesis": "ServiceNow is a new 2.2 percent position because the market discounted its shares on unfounded AI disruption fears, creating a mispricing that will close as the company proves it can monetize AI to accelerate growth. ServiceNow orchestrates corporate IT workflows, but the stock de-rated after OpenAI launched a competing agent. The mispricing exists because the market treats this as an existential threat. Instead, the company is monetizing its own AI tools, which directly accelerates revenue growth and drives a multiple re-rating as disruption fears fade.\n\nThe bear case assumes standalone AI agents will cannibalize software seats. Yet the company recently reported its AI annual contract value crossed $1 billion, proving customers are paying for integrated AI rather than abandoning the platform. The thesis breaks if enterprise IT budget tightening delays large upgrade cycles.\n\nThe next test is the earnings print on October 28.\n\nPosting reasoning, not a recommendation."
-                }
-            ],
-            "data_unavailable_streak": 0
-        },
-        "HOOD_GROWTH": {
-            "entry_price": 90.33999633789062,
-            "shares": 38.1320097923798,
-            "allocated_capital": 3444.8456250000004,
-            "strategy_bucket": "GROWTH",
-            "purchase_date": "2026-08-03",
-            "buying_thesis": "PWER score 25.5, debate outcome MODERATE. HOOD de-rated 41.3% from its 52w high despite 32.3% revenue growth and expanding margins. The narrative gap presents a compelling growth opportunity as retail trading volumes stabilize.",
-            "high_watermark": 124.72000122070312,
-            "trim_count": 1,
-            "tailwind_at_entry": "UNCATEGORIZED",
-            "regime_at_entry": "BULL",
-            "pwer_at_entry": 25.5,
-            "pwer_last_known": 10.5,
-            "last_reunderwritten": "2026-10-06",
-            "forced_review_fail_streak": 4,
-            "dip_buy_count": 0,
-            "pwer_drift_streak": 1,
-            "last_dip_buy_date": null,
-            "thesis_log": [
-                {
-                    "date": "2026-08-03",
-                    "action": "INITIAL_BUY",
-                    "usd": 4593.13,
-                    "price": 90.34,
-                    "thesis": "Robinhood is a new 4.5 percent position because the market is mispricing its structural margin expansion as a temporary crypto cycle.\n\nAs a retail financial brokerage, Robinhood monetizes user engagement through trading and interest. The stock de-rated on fears that a crypto winter would break the business model, but the underlying engine is proving resilient. By expanding its broader product suite, the company drives operating leverage even as crypto volumes drop. This means that as retail engagement stabilizes, the firm generates cash at a higher rate than historically priced, forcing a multiple re-rating.\n\nThe market is pricing in a severe crypto volume collapse. The strongest evidence this fear is misplaced is the recent quarter where overall revenue still grew 32 percent despite the crypto drag. The thesis breaks if regulatory action restricts payment for order flow.\n\nThe next test is the earnings print expected November 4.\n\nPosting reasoning, not a recommendation."
                 }
             ],
             "data_unavailable_streak": 0
@@ -344,7 +315,7 @@
             "pwer_at_entry": 27.8,
             "pwer_last_known": 12.5,
             "last_reunderwritten": "2026-10-02",
-            "forced_review_fail_streak": 3,
+            "forced_review_fail_streak": 4,
             "dip_buy_count": 0,
             "pwer_drift_streak": 1,
             "last_dip_buy_date": null,
@@ -402,7 +373,7 @@
             "pwer_at_entry": 27.5,
             "pwer_last_known": 12.0,
             "last_reunderwritten": "2026-10-05",
-            "forced_review_fail_streak": 3,
+            "forced_review_fail_streak": 4,
             "dip_buy_count": 0,
             "pwer_drift_streak": 1,
             "last_dip_buy_date": null,
@@ -457,6 +428,12 @@
             "pos_key": "CRM_VALUE",
             "exit_price": 252.05,
             "why": "TAKE_PROFIT: V price $252.0500030517578 reached intrinsic value $206.2"
+        },
+        "HOOD": {
+            "date": "2026-10-12",
+            "pos_key": "HOOD_GROWTH",
+            "exit_price": 109.22,
+            "why": "AGENT_SELL (trim limit 1 reached) [escalated: already trimmed \u2014 closing in full]"
         }
     }
 }
