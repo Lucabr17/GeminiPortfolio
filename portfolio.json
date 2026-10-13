@@ -245,19 +245,19 @@
         },
         "NOW_VALUE": {
             "entry_price": 114.19000244140625,
-            "shares": 19.546716962983478,
-            "allocated_capital": 2232.03965772456,
+            "shares": 9.773358481491739,
+            "allocated_capital": 1116.01982886228,
             "strategy_bucket": "VALUE",
             "purchase_date": "2026-08-03",
             "buying_thesis": "PWER score 23.5, debate outcome MODERATE. NOW is a secular growth compounder trading at a deep 49.8% historical discount with 24.0% revenue growth. Filed evidence disproves the disruption narrative, making this a strong value play in the current regime.",
             "high_watermark": 147.99000549316406,
-            "trim_count": 0,
+            "trim_count": 1,
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 23.5,
             "pwer_last_known": 9.5,
             "last_reunderwritten": "2026-10-01",
-            "forced_review_fail_streak": 4,
+            "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
             "pwer_drift_streak": 1,
             "last_dip_buy_date": null,
@@ -303,19 +303,19 @@
         },
         "AXON_GROWTH": {
             "entry_price": 522.4600219726562,
-            "shares": 12.172452881634722,
-            "allocated_capital": 6359.62,
+            "shares": 6.086226440817361,
+            "allocated_capital": 3179.81,
             "strategy_bucket": "GROWTH",
             "purchase_date": "2026-08-06",
             "buying_thesis": "Adding AXON to fill the open slot. PWER is strong at 27.75% with a MODERATE thesis strength and HIGH conviction. The company is delivering 33.7% revenue growth with 59.5% gross margins, presenting a compelling opportunity to close the narrative gap after a 41% de-rating.",
             "high_watermark": 645.719970703125,
-            "trim_count": 0,
+            "trim_count": 1,
             "tailwind_at_entry": "UNCATEGORIZED",
             "regime_at_entry": "BULL",
             "pwer_at_entry": 27.8,
             "pwer_last_known": 12.5,
             "last_reunderwritten": "2026-10-02",
-            "forced_review_fail_streak": 4,
+            "forced_review_fail_streak": 0,
             "dip_buy_count": 0,
             "pwer_drift_streak": 1,
             "last_dip_buy_date": null,
@@ -359,35 +359,6 @@
             ],
             "data_unavailable_streak": 0
         },
-        "RKLB_GROWTH": {
-            "entry_price": 82.08000183105469,
-            "shares": 42.58680460552183,
-            "allocated_capital": 3495.5249999999996,
-            "strategy_bucket": "GROWTH",
-            "purchase_date": "2026-08-17",
-            "buying_thesis": "Initiating RKLB (PWER 27.5%, thesis_strength MODERATE) as an opportunity cost swap replacement for ORCL. RKLB offers a compelling narrative gap setup with 62% revenue growth despite a 46% de-rating from highs.",
-            "high_watermark": 82.08000183105469,
-            "trim_count": 1,
-            "tailwind_at_entry": "UNCATEGORIZED",
-            "regime_at_entry": "BULL",
-            "pwer_at_entry": 27.5,
-            "pwer_last_known": 12.0,
-            "last_reunderwritten": "2026-10-05",
-            "forced_review_fail_streak": 4,
-            "dip_buy_count": 0,
-            "pwer_drift_streak": 1,
-            "last_dip_buy_date": null,
-            "thesis_log": [
-                {
-                    "date": "2026-08-17",
-                    "action": "INITIAL_BUY",
-                    "usd": 4660.7,
-                    "price": 82.08,
-                    "thesis": "Rocket Lab is a new 4.5 percent position because the market is mispricing its transition from a niche launch provider to an end-to-end space systems prime.\n\nThe company builds rockets and satellite infrastructure, but the stock is penalized as a capital-intensive launch business. The actual value driver is the rapid scaling of its space systems contracts, which command structurally higher margins. As the upcoming medium-lift Neutron rocket comes online, it unlocks larger payload markets and vertically integrates their satellite services, directly driving margin expansion across the entire business model.\n\nThe bear case assumes Neutron development delays or launch failures will burn through cash reserves. However, their expanding backlog provides a cash-flow bridge that insulates the balance sheet from launch-schedule volatility. The thesis breaks if space systems revenue stalls before Neutron achieves regular flight.\n\nWe are watching the Q3 earnings print in mid-November 2026 to verify continued backlog conversion.\n\nPosting reasoning, not a recommendation."
-                }
-            ],
-            "data_unavailable_streak": 0
-        },
         "NVO_GROWTH": {
             "entry_price": 44.880001068115234,
             "shares": 76.83055718204508,
@@ -423,16 +394,16 @@
         "shares": NaN
     },
     "recent_exits": {
-        "CRM": {
-            "date": "2026-08-28",
-            "pos_key": "CRM_VALUE",
-            "exit_price": 252.05,
-            "why": "TAKE_PROFIT: V price $252.0500030517578 reached intrinsic value $206.2"
-        },
         "HOOD": {
             "date": "2026-10-12",
             "pos_key": "HOOD_GROWTH",
             "exit_price": 109.22,
+            "why": "AGENT_SELL (trim limit 1 reached) [escalated: already trimmed \u2014 closing in full]"
+        },
+        "RKLB": {
+            "date": "2026-10-13",
+            "pos_key": "RKLB_GROWTH",
+            "exit_price": 64.22,
             "why": "AGENT_SELL (trim limit 1 reached) [escalated: already trimmed \u2014 closing in full]"
         }
     }
