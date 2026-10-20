@@ -150,7 +150,7 @@
             "strategy_bucket": "VALUE",
             "purchase_date": "2026-07-13",
             "buying_thesis": "Adding LLY to VALUE bucket. PWER score of 18.9 with MODERATE thesis strength. Aligns with the directive to add Healthcare/Biotech exposure. Offers 55.5% hypergrowth at a 21% historical discount.",
-            "high_watermark": 1280.3399658203125,
+            "high_watermark": 1283.6600341796875,
             "trim_count": 0,
             "tailwind_at_entry": "HEALTHCARE_BIOTECH",
             "regime_at_entry": "BULL",
@@ -243,35 +243,6 @@
             ],
             "data_unavailable_streak": 0
         },
-        "NOW_VALUE": {
-            "entry_price": 114.19000244140625,
-            "shares": 9.773358481491739,
-            "allocated_capital": 1116.01982886228,
-            "strategy_bucket": "VALUE",
-            "purchase_date": "2026-08-03",
-            "buying_thesis": "PWER score 23.5, debate outcome MODERATE. NOW is a secular growth compounder trading at a deep 49.8% historical discount with 24.0% revenue growth. Filed evidence disproves the disruption narrative, making this a strong value play in the current regime.",
-            "high_watermark": 148.57000732421875,
-            "trim_count": 1,
-            "tailwind_at_entry": "UNCATEGORIZED",
-            "regime_at_entry": "BULL",
-            "pwer_at_entry": 23.5,
-            "pwer_last_known": 9.5,
-            "last_reunderwritten": "2026-10-01",
-            "forced_review_fail_streak": 4,
-            "dip_buy_count": 0,
-            "pwer_drift_streak": 1,
-            "last_dip_buy_date": null,
-            "thesis_log": [
-                {
-                    "date": "2026-08-03",
-                    "action": "INITIAL_BUY",
-                    "usd": 2232.04,
-                    "price": 114.19,
-                    "thesis": "ServiceNow is a new 2.2 percent position because the market discounted its shares on unfounded AI disruption fears, creating a mispricing that will close as the company proves it can monetize AI to accelerate growth. ServiceNow orchestrates corporate IT workflows, but the stock de-rated after OpenAI launched a competing agent. The mispricing exists because the market treats this as an existential threat. Instead, the company is monetizing its own AI tools, which directly accelerates revenue growth and drives a multiple re-rating as disruption fears fade.\n\nThe bear case assumes standalone AI agents will cannibalize software seats. Yet the company recently reported its AI annual contract value crossed $1 billion, proving customers are paying for integrated AI rather than abandoning the platform. The thesis breaks if enterprise IT budget tightening delays large upgrade cycles.\n\nThe next test is the earnings print on October 28.\n\nPosting reasoning, not a recommendation."
-                }
-            ],
-            "data_unavailable_streak": 0
-        },
         "GOOG_GROWTH": {
             "entry_price": 375.3500061035156,
             "shares": 13.258675686893476,
@@ -297,35 +268,6 @@
                     "usd": 9953.29,
                     "price": 375.35,
                     "thesis": "Alphabet is a new 9.6 percent position because its Gemini integration defends its search moat while accelerating cloud adoption.\n\nAs a dominant search and infrastructure provider, the business is compounding secularly. Embedding Gemini directly into its ecosystem protects the primary advertising engine from alternative platforms. This AI capability also drives enterprise demand, flowing directly into accelerated cloud revenue growth and supporting an attractive valuation multiple.\n\nThe bear case prices in market share erosion from AI alternatives and regulatory antitrust actions, highlighted by recent ad-tech lawsuits and browser divestiture pressure. The strongest evidence against this is the recent 24.2 percent revenue growth, proving AI tools are expanding usage rather than cannibalizing it. The falsifier would be a sequential decline in core search volume.\n\nThe next test is the third-quarter earnings print expected in late October.\n\nPosting reasoning, not a recommendation."
-                }
-            ],
-            "data_unavailable_streak": 0
-        },
-        "AXON_GROWTH": {
-            "entry_price": 522.4600219726562,
-            "shares": 6.086226440817361,
-            "allocated_capital": 3179.81,
-            "strategy_bucket": "GROWTH",
-            "purchase_date": "2026-08-06",
-            "buying_thesis": "Adding AXON to fill the open slot. PWER is strong at 27.75% with a MODERATE thesis strength and HIGH conviction. The company is delivering 33.7% revenue growth with 59.5% gross margins, presenting a compelling opportunity to close the narrative gap after a 41% de-rating.",
-            "high_watermark": 645.719970703125,
-            "trim_count": 1,
-            "tailwind_at_entry": "UNCATEGORIZED",
-            "regime_at_entry": "BULL",
-            "pwer_at_entry": 27.8,
-            "pwer_last_known": 12.5,
-            "last_reunderwritten": "2026-10-02",
-            "forced_review_fail_streak": 4,
-            "dip_buy_count": 0,
-            "pwer_drift_streak": 1,
-            "last_dip_buy_date": null,
-            "thesis_log": [
-                {
-                    "date": "2026-08-06",
-                    "action": "INITIAL_BUY",
-                    "usd": 6359.62,
-                    "price": 522.46,
-                    "thesis": "Axon is a new 6.2 percent position because the market is mispricing its evolution from a hardware vendor to a high-margin cloud ecosystem.\n\nAxon dominates the law enforcement technology stack, but is still valued as a cyclical hardware business. As police departments upgrade, the real mechanism is the aggressive bundling of software and cloud storage with every device. This mix shift structurally expands profitability, driving 59.5 percent gross margins and accelerating cash flow beyond legacy multiples.\n\nThe bear case is that municipal budget constraints will delay large-scale deployments. Yet the company is delivering relentless revenue growth, proving public safety tech is treated as non-discretionary even in tight environments. The falsifier I am watching is any sequential compression in software attachment rates, which would signal pricing power is cracking.\n\nThe Goldman Sachs technology conference on September 8 is the next catalyst to confirm federal bookings momentum.\n\nPosting reasoning, not a recommendation."
                 }
             ],
             "data_unavailable_streak": 0
@@ -404,6 +346,18 @@
             "date": "2026-10-13",
             "pos_key": "RKLB_GROWTH",
             "exit_price": 64.22,
+            "why": "AGENT_SELL (trim limit 1 reached) [escalated: already trimmed \u2014 closing in full]"
+        },
+        "NOW": {
+            "date": "2026-10-20",
+            "pos_key": "NOW_VALUE",
+            "exit_price": 149.54,
+            "why": "AGENT_SELL (trim limit 1 reached) [escalated: already trimmed \u2014 closing in full]"
+        },
+        "AXON": {
+            "date": "2026-10-20",
+            "pos_key": "AXON_GROWTH",
+            "exit_price": 392.64,
             "why": "AGENT_SELL (trim limit 1 reached) [escalated: already trimmed \u2014 closing in full]"
         }
     }
