@@ -286,7 +286,7 @@
             "pwer_at_entry": 14.0,
             "pwer_last_known": 15.8,
             "last_reunderwritten": null,
-            "forced_review_fail_streak": 1,
+            "forced_review_fail_streak": 2,
             "dip_buy_count": 0,
             "pwer_drift_streak": 0,
             "last_dip_buy_date": null,
