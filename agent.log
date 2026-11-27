@@ -573716,3 +573716,4 @@ Sleeve now $nan (nan% of NAV) | true cash $nan (nan%, floor 4%) | regime cap 100
 2026-11-17 02:56:51,756 | INFO |    Gemini API attempts this cycle: 30 (9 grounded)                     
 2026-11-17 02:56:51,756 | INFO |    Book: 0.0% stocks | 0.0% SPY sleeve | 0.0% cash
 2026-11-17 02:56:51,756 | INFO | ============================================================
+2026-11-27 02:50:15,667 | INFO | [Gate] US market closed today (Thanksgiving Day) — cycle skipped, no API spend.
